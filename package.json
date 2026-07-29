@@ -1,0 +1,26 @@
+{
+  "name": "odfinex-games",
+  "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:generate": "pnpm --filter @odfinex/db db:generate",
+    "db:migrate": "pnpm --filter @odfinex/db db:migrate",
+    "db:push": "pnpm --filter @odfinex/db db:push",
+    "db:seed": "pnpm --filter @odfinex/db db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  }
+}
