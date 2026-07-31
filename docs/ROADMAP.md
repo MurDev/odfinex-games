@@ -16,26 +16,24 @@
 | 7 | CI/CD | ✅ | GitHub Actions (lint/typecheck/test/build) vert ; deploys auto Vercel ; cache turbo partagé |
 | 8 | Google OAuth prod | ✅ | Callback URIs enregistrées (web + admin) |
 | 9 | Accès admin | ✅ | `is_admin = true` pour l'email admin |
+| 10 | Modèle 2 environnements par jeu | ✅ | Chaque jeu = 2 paires credentials (`{slug}.{env}`), wallet isolé par env, grant prod sandbox-only |
+| 11 | Publication npm du SDK | ✅ | `@odfinex/shared@0.1.x` + `@odfinex/games-sdk@0.1.x` publics (scope `odfinex`) |
+| 12 | Intégration SDK dans DUELPION | ✅ | Dépendances npm, clientId `duelpion.live` / `duelpion.sandbox`, S2S crédit sur victoire |
+| 13 | Jeux créés en prod | ✅ | `sandbox` (hidden) + `duelpion` en sandbox **et** live, `walletEnabled=true` |
+| 14 | Repo + CI DUELPION | ✅ | `MurDev/duelpion-web` (main = web app, `legacy-v1` = ancien), Dockerfile serveur |
+| 15 | Déployer DUELPION | 🚧 | Front Vercel en ligne (`duelpion-web.vercel.app`) ; serveur Railway sur volume persisté, en attente du package fix |
 
 ## À faire
 
 | Priorité | Élément | Statut | Détail |
 |---|---|---|---|
-| **P1** | **Intégration SDK dans DUELPION** | À faire | On regarde **d'abord** l'intégration du SDK dans DUELPION (hors monorepo) : `baseUrl` prod, `clientId`/`clientSecret` côté serveur, `getSession`/`getBalance`, mutations wallet. Voir [`SDK-INTEGRATION.md`](./SDK-INTEGRATION.md). |
-| **P1** | **Modèle 2 environnements par jeu (admin)** | À faire | Chaque jeu expose **deux environnements** : `sandbox` et `live` (prod), soit **2 paires `clientId`/`client_secret`** par jeu, comme les grandes plateformes (PayPal, Stripe, …). Impact : schema `game_client` (env), admin UI, seed, docs intégrateur. |
-| P2 | Créer les jeux dans l'admin prod | À faire | `sandbox` + `duelpion` avec `launchUrl` prod → `odfinex-play` / DUELPION, `walletEnabled` selon le besoin |
-| P2 | Déployer DUELPION | À faire | Vercel (Next.js) + env vars prod (API_URL, clientId, client_secret) |
-| P2 | Vérifier le flux S2S complet en prod | À faire | launch → token → mutation wallet signée (et non signée refusée en 401) |
-| P3 | Domaine personnalisé | À faire | `odfinexgames` → web, `play.odfinexgames` → play (Vercel custom domain) |
-| P3 | Publication npm du SDK | À faire | `@odfinex/games-sdk` sur npm (privé ou public) |
+| **P1** | **Vérifier le flux S2S complet en prod** | À faire | launch → token → mutation wallet signée (et non signée refusée en 401), isolation sandbox/live |
+| P2 | Domaine personnalisé | À faire | `odfinexgames` → web, `play.odfinexgames` → play (Vercel custom domain) |
 | P3 | Paiements MonCash | À faire | Dépôts / retraits sur le wallet |
 | P4 | Catalogue web riche (Phase 3) | À faire | Listes, détails jeu, profils joueurs |
 
 ## Décisions en attente
 
-- **Modèle des environnements jeu** (sandbox/live) : à préciser avant l'implémentation admin
-  (2 jeux séparés `sandbox`/`live` vs un jeu avec champ `environment` et 2 paires de credentials).
-  Voir [`S2S-AUTH.md`](./S2S-AUTH.md#evolution-modele-2-environnements) pour la proposition retenue.
 - **Wallet** : activer `walletEnabled` sur quels jeux, montant de crédit test, seuils.
 - **Catalogue** : liste publique des jeux (actuellement `sandbox` masqué).
 
@@ -43,3 +41,6 @@
 
 - **31 juillet 2026** : deploiement production (Vercel + Railway + Postgres), CI vert, secrets turbo,
   URLs prod corrigées (`odfinex-web` au lieu de `odfinex-games`), login admin OK, `is_admin` activé.
+- **31 juillet 2026** : modèle 2 environnements implémenté et déployé (migration `0004`, wallet isolé,
+  grant sandbox-only en prod) ; packages npm `@odfinex/*` publiés ; jeu `duelpion.live` créé en prod ;
+  front DUELPION déployé sur Vercel, serveur déployé sur Railway (volume persisté).

@@ -21,6 +21,14 @@ GitHub (MurDev/odfinex-games)
              │  https://odfinex-api-production.up.railway.app  (/health)
              ▼
         Postgres 16 (Railway, region sfo, volume persisté)
+
+DUELPION (web app)
+   │  git push → MurDev/duelpion-web (main)
+   ├─ Vercel : duelpion-web → https://duelpion-web.vercel.app
+   │     (appelle API Odfinex + serveur DUELPION)
+   └─ Railway : duelpion (serveur Hono + SQLite)
+         │  https://duelpion-production.up.railway.app  (/health)
+         └─ volume persisté /data → server/data/duelpion.db
 ```
 
 ## Services
@@ -32,13 +40,17 @@ GitHub (MurDev/odfinex-games)
 | `odfinex-play` | Vercel | `/launch/[clientId]` + sandbox SDK | https://odfinex-play.vercel.app |
 | `odfinex-api` | Railway | Hono API (identity, launch, wallet) | https://odfinex-api-production.up.railway.app |
 | Postgres | Railway | Base de données | interne, service `Postgres` |
+| `duelpion-web` | Vercel | Front DUELPION (Next.js + Phaser) | https://duelpion-web.vercel.app |
+| `duelpion` | Railway | Serveur DUELPION (Hono + SQLite persisté) | https://duelpion-production.up.railway.app |
 
 ### Identifiants utiles
 
 - Vercel team : `murdet-pierres-projects` (slug `murdet-pierres-projects`)
-- Projets Vercel : `odfinex-web`, `odfinex-admin`, `odfinex-play`
+- Projets Vercel : `odfinex-web`, `odfinex-admin`, `odfinex-play`, `duelpion-web`
 - Projet Railway : `odfinex-games` (id `297d36ba-6b74-4d86-a24f-3e1b0741b961`), service `odfinex-api`
+- Projet Railway : `duelpion` (id `ca0b6503-3016-459c-9088-acb7213ae735`), service `duelpion`
 - Repo : `https://github.com/MurDev/odfinex-games` (public)
+- Repo : `https://github.com/MurDev/duelpion-web` (privé)
 
 ## Git flow
 
@@ -85,7 +97,7 @@ main          →  production (CI + deploys Vercel)
 | `PORT` | `4000` |
 | `WEB_URL` | `https://odfinex-web.vercel.app` |
 | `PLAY_URL` | `https://odfinex-play.vercel.app` |
-| `CORS_ORIGINS` | `https://odfinex-web.vercel.app` |
+| `CORS_ORIGINS` | `https://odfinex-web.vercel.app,https://duelpion-web.vercel.app` |
 
 ### Vercel (web/admin/play, targets production + preview)
 
@@ -100,13 +112,58 @@ main          →  production (CI + deploys Vercel)
 
 > Vercel injecte aussi `VERCEL_*`, et turbo doit les voir via `globalPassThroughEnv` dans `turbo.json` (DATABASE_URL, AUTH_*, API_URL, PLAY_URL, WEB_URL, PORT).
 
+### Railway `duelpion` (serveur DUELPION)
+
+| Variable | Valeur |
+|---|---|
+| `PORT` | `3100` |
+| `ODFINEX_API_URL` | `https://odfinex-api-production.up.railway.app` |
+| `ODFINEX_CLIENT_ID` | `duelpion.live` |
+| `ODFINEX_CLIENT_SECRET` | secret live du jeu `duelpion.live` (voir admin) |
+| `APP_URL` | `https://duelpion-web.vercel.app` |
+| `DUELPION_DB_PATH` | `/data/duelpion.db` (volume `duelpion-volume` monté sur `/data`) |
+
+### Vercel `duelpion-web` (production)
+
+| Variable | Valeur |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | `https://odfinex-api-production.up.railway.app` |
+| `NEXT_PUBLIC_WEB_URL` | `https://odfinex-web.vercel.app` |
+| `NEXT_PUBLIC_PLAY_URL` | `https://odfinex-play.vercel.app` |
+| `NEXT_PUBLIC_ODFINEX_CLIENT_ID` | `duelpion.live` |
+| `NEXT_PUBLIC_APP_URL` | `https://duelpion-web.vercel.app` |
+| `NEXT_PUBLIC_DUELPION_API_URL` | `https://duelpion-production.up.railway.app` |
+
+## Modèle 2 environnements par jeu
+
+Chaque jeu expose **2 paires `clientId`/`client_secret`** : `{slug}.sandbox` et `{slug}.live`.
+
+- `clientId = {slug}.{environment}`, ex. `duelpion.live`, `sandbox.sandbox`.
+- Secrets sandbox = secret de test bien connu (`sandbox_test_secret_change_me`), visibles côté client.
+- Secrets live = secrets serveur, à ne **jamais** exposer côté client.
+- Wallet isolé par environnement (`wallet_account` PK `(user_id, environment)`).
+- `grant` n'est autorisé que pour `environment='sandbox'` en production.
+- Catalogue public (`/v1/games`) : jeux `isActive` + `environment='live'` + `hidden=false`.
+
+## Packages npm
+
+| Package | Version | Usage |
+|---|---|---|
+| `@odfinex/shared` | `0.1.x` | Types partagés (`User`, `WalletEnvironment`, …) |
+| `@odfinex/games-sdk` | `0.1.x` | SDK client/serveur (auth, wallet S2S) |
+
+- Publier (scope `odfinex`, 2FA email) : `npm publish --access public` dans `packages/shared` puis `packages/sdk`.
+- `exports` du package : conditions `import`, `require` et `default` (nécessaire pour tsx / CJS).
+
 ## Notes opérationnelles
 
 - **Login Google** : les callback URIs enregistrées côté Google (console) :
   - `https://odfinex-web.vercel.app/api/auth/callback/google`
   - `https://odfinex-admin.vercel.app/api/auth/callback/google`
 - **Accès admin** : `UPDATE "user" SET is_admin = true WHERE email = '...'` (table `user`, colonne `is_admin`).
-- **DB prod** : accessible en psql via `DATABASE_PUBLIC_URL` (`*.proxy.rlwy.net`).
+- **Serveur DUELPION** : déployé via le `Dockerfile` du repo (`node:22-slim`, `npm ci`, `tsx`),
+  `CMD` = migrations SQLite puis serveur ; `better-sqlite3` compilé depuis source (build tools dans le stage `deps`).
+- **DB prod** : accessible en psql via un TCP proxy public temporaire (`railway tcp-proxy create --port 5432 -s <postgres>`), à supprimer après usage.
 - **Cache turbo** : `turbo.json` → `remoteCache.enabled` + secrets GitHub `TURBO_TOKEN`/`TURBO_TEAM`.
 - Redéploiement Vercel sans commit : bouton *Redeploy* du dashboard, ou CLI depuis le dossier de l'app
   (`vercel --prod --force`). Attention au `rootDirectory` quand on lance depuis un sous-dossier.
