@@ -2,20 +2,32 @@ import { and, eq } from "drizzle-orm";
 import { ledgerEntries, walletAccounts } from "@odfinex/db";
 
 import { db } from "../db.js";
+import type { WalletEnvironment } from "@odfinex/shared";
 
-export async function ensureWallet(userId: string) {
+export async function ensureWallet(
+  userId: string,
+  environment: WalletEnvironment = "live",
+) {
   await db
     .insert(walletAccounts)
-    .values({ userId, balanceCents: 0 })
+    .values({ userId, environment, balanceCents: 0 })
     .onConflictDoNothing();
 }
 
-export async function getBalanceCents(userId: string): Promise<number> {
-  await ensureWallet(userId);
+export async function getBalanceCents(
+  userId: string,
+  environment: WalletEnvironment = "live",
+): Promise<number> {
+  await ensureWallet(userId, environment);
   const row = await db
     .select({ balanceCents: walletAccounts.balanceCents })
     .from(walletAccounts)
-    .where(eq(walletAccounts.userId, userId))
+    .where(
+      and(
+        eq(walletAccounts.userId, userId),
+        eq(walletAccounts.environment, environment),
+      ),
+    )
     .limit(1)
     .then((rows) => rows[0]);
   return row?.balanceCents ?? 0;
@@ -24,6 +36,7 @@ export async function getBalanceCents(userId: string): Promise<number> {
 type MutationInput = {
   userId: string;
   clientId: string;
+  environment: WalletEnvironment;
   type: "debit" | "credit";
   amountCents: number;
   reason: string;
@@ -41,12 +54,12 @@ export type MutationResult =
 export async function applyLedgerMutation(
   input: MutationInput,
 ): Promise<MutationResult> {
-  const { userId, clientId, type, amountCents, reason, referenceId } = input;
+  const { userId, clientId, environment, type, amountCents, reason, referenceId } = input;
 
   return db.transaction(async (tx) => {
     await tx
       .insert(walletAccounts)
-      .values({ userId, balanceCents: 0 })
+      .values({ userId, environment, balanceCents: 0 })
       .onConflictDoNothing();
 
     const existing = await tx
@@ -84,7 +97,12 @@ export async function applyLedgerMutation(
     const locked = await tx
       .select({ balanceCents: walletAccounts.balanceCents })
       .from(walletAccounts)
-      .where(eq(walletAccounts.userId, userId))
+      .where(
+        and(
+          eq(walletAccounts.userId, userId),
+          eq(walletAccounts.environment, environment),
+        ),
+      )
       .for("update")
       .limit(1)
       .then((rows) => rows[0]);
@@ -110,6 +128,7 @@ export async function applyLedgerMutation(
       .values({
         userId,
         clientId,
+        environment,
         type,
         amountCents,
         balanceAfterCents: next,
@@ -126,7 +145,12 @@ export async function applyLedgerMutation(
     await tx
       .update(walletAccounts)
       .set({ balanceCents: next, updatedAt: new Date() })
-      .where(eq(walletAccounts.userId, userId));
+      .where(
+        and(
+          eq(walletAccounts.userId, userId),
+          eq(walletAccounts.environment, environment),
+        ),
+      );
 
     return {
       ok: true as const,

@@ -21,7 +21,12 @@ export function NewGameButton() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdId, setCreatedId] = useState("");
-  const [form, setForm] = useState({ name: "", launchUrl: "" });
+  const [form, setForm] = useState({
+    name: "",
+    slug: "",
+    environment: "live",
+    launchUrl: "",
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -43,7 +48,7 @@ export function NewGameButton() {
 
       const data = await res.json();
       setCreatedId(data.game.clientId);
-      setForm({ name: "", launchUrl: "" });
+      setForm({ name: "", slug: "", environment: "live", launchUrl: "" });
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue");
@@ -64,7 +69,7 @@ export function NewGameButton() {
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Ajouter un jeu</DialogTitle>
-            <DialogDescription>Enregistrer un nouveau jeu sur la plateforme</DialogDescription>
+            <DialogDescription>Enregistrer un jeu et son environnement</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -77,6 +82,30 @@ export function NewGameButton() {
               />
             </div>
             <div className="space-y-2">
+              <label className="text-sm font-medium">Slug</label>
+              <Input
+                placeholder="monjeu"
+                value={form.slug}
+                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Le <code className="font-mono">clientId</code> sera{" "}
+                <code className="font-mono">{form.slug || "slug"}.{form.environment}</code>
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Environnement</label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                value={form.environment}
+                onChange={(e) => setForm((f) => ({ ...f, environment: e.target.value }))}
+              >
+                <option value="live">Live</option>
+                <option value="sandbox">Sandbox</option>
+              </select>
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">URL de lancement</label>
               <Input
                 placeholder="https://monjeu.com"
@@ -86,9 +115,6 @@ export function NewGameButton() {
                 required
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Le <code className="font-mono">clientId</code> sera genere automatiquement.
-            </p>
             {createdId && (
               <p className="text-xs text-emerald-400">
                 Jeu cree avec l&apos;ID <code className="font-mono">{createdId}</code>

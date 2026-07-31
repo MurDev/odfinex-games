@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
-import { launchTokens, ledgerEntries, sessions } from "@odfinex/db";
+import { gameClients, launchTokens, ledgerEntries, sessions } from "@odfinex/db";
+import type { WalletEnvironment } from "@odfinex/shared";
 import {
   WalletGrantRequestSchema,
   WalletMutationRequestSchema,
@@ -29,19 +30,20 @@ type PlatformEnv = { Variables: AuthVariables };
 
 export const walletRoutes = new Hono();
 
-async function resolveUserIdFromRequest(c: {
+async function resolveWalletContext(c: {
   req: {
     header: (name: string) => string | undefined;
   };
-}): Promise<string | null> {
+}): Promise<{ userId: string; environment: WalletEnvironment } | null> {
   const auth = c.req.header("authorization");
   const [scheme, token] = auth?.split(" ") ?? [];
   const cookie = c.req.header("cookie");
 
   if (scheme?.toLowerCase() === "bearer" && token) {
     const launchRow = await db
-      .select({ userId: launchTokens.userId })
+      .select({ userId: launchTokens.userId, environment: gameClients.environment })
       .from(launchTokens)
+      .innerJoin(gameClients, eq(launchTokens.clientId, gameClients.clientId))
       .where(
         and(
           eq(launchTokens.tokenHash, hashToken(token)),
@@ -50,7 +52,9 @@ async function resolveUserIdFromRequest(c: {
       )
       .limit(1)
       .then((rows) => rows[0] ?? null);
-    if (launchRow) return launchRow.userId;
+    if (launchRow) {
+      return { userId: launchRow.userId, environment: launchRow.environment };
+    }
 
     const sess = await db
       .select({ userId: sessions.userId })
@@ -58,7 +62,7 @@ async function resolveUserIdFromRequest(c: {
       .where(and(eq(sessions.sessionToken, token), gt(sessions.expires, new Date())))
       .limit(1)
       .then((rows) => rows[0] ?? null);
-    if (sess) return sess.userId;
+    if (sess) return { userId: sess.userId, environment: "live" };
   }
 
   if (cookie) {
@@ -88,7 +92,7 @@ async function resolveUserIdFromRequest(c: {
         )
         .limit(1)
         .then((rows) => rows[0] ?? null);
-      if (sess) return sess.userId;
+      if (sess) return { userId: sess.userId, environment: "live" };
     }
   }
 
@@ -97,12 +101,12 @@ async function resolveUserIdFromRequest(c: {
 
 /** GET /v1/wallet — launch token OR platform session */
 walletRoutes.get("/wallet", async (c) => {
-  const userId = await resolveUserIdFromRequest(c);
-  if (!userId) {
+  const ctx = await resolveWalletContext(c);
+  if (!ctx) {
     return apiError(c, 401, "UNAUTHORIZED", "Missing session or launch token");
   }
-  const balanceCents = await getBalanceCents(userId);
-  return c.json({ balanceCents, currency: "HTG" as const });
+  const balanceCents = await getBalanceCents(ctx.userId, ctx.environment);
+  return c.json({ balanceCents, currency: "HTG" as const, environment: ctx.environment });
 });
 
 const money = new Hono<LaunchEnv>();
@@ -110,6 +114,7 @@ const money = new Hono<LaunchEnv>();
 money.post("/wallet/debit", requireLaunchToken, requireClientSignature, async (c) => {
   const user = c.get("user");
   const clientId = c.get("clientId");
+  const environment = c.get("environment");
   const walletEnabled = c.get("walletEnabled");
 
   if (!walletEnabled) {
@@ -125,6 +130,7 @@ money.post("/wallet/debit", requireLaunchToken, requireClientSignature, async (c
   const result = await applyLedgerMutation({
     userId: user.id,
     clientId,
+    environment,
     type: "debit",
     ...parsed.data,
   });
@@ -144,6 +150,7 @@ money.post("/wallet/debit", requireLaunchToken, requireClientSignature, async (c
 money.post("/wallet/credit", requireLaunchToken, async (c) => {
   const user = c.get("user");
   const clientId = c.get("clientId");
+  const environment = c.get("environment");
   const walletEnabled = c.get("walletEnabled");
 
   if (!walletEnabled) {
@@ -159,6 +166,7 @@ money.post("/wallet/credit", requireLaunchToken, async (c) => {
   const result = await applyLedgerMutation({
     userId: user.id,
     clientId,
+    environment,
     type: "credit",
     ...parsed.data,
   });
@@ -183,12 +191,17 @@ player.get("/wallet/transactions", requirePlatformSession, async (c) => {
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
   const offset = Number(c.req.query("offset") ?? 0) || 0;
 
-  await ensureWallet(user.id);
+  await ensureWallet(user.id, "live");
+
+  const whereClause = and(
+    eq(ledgerEntries.userId, user.id),
+    eq(ledgerEntries.environment, "live"),
+  );
 
   const items = await db
     .select()
     .from(ledgerEntries)
-    .where(eq(ledgerEntries.userId, user.id))
+    .where(whereClause)
     .orderBy(desc(ledgerEntries.createdAt))
     .limit(limit)
     .offset(offset);
@@ -196,7 +209,7 @@ player.get("/wallet/transactions", requirePlatformSession, async (c) => {
   const countRow = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(ledgerEntries)
-    .where(eq(ledgerEntries.userId, user.id))
+    .where(whereClause)
     .then((rows) => rows[0]);
 
   return c.json({
@@ -207,6 +220,7 @@ player.get("/wallet/transactions", requirePlatformSession, async (c) => {
       balanceAfterCents: row.balanceAfterCents,
       reason: row.reason,
       clientId: row.clientId,
+      environment: row.environment as WalletEnvironment,
       referenceId: row.referenceId,
       createdAt: row.createdAt.toISOString(),
     })),
@@ -215,10 +229,6 @@ player.get("/wallet/transactions", requirePlatformSession, async (c) => {
 });
 
 player.post("/wallet/grant", requirePlatformSession, async (c) => {
-  if (process.env.NODE_ENV === "production") {
-    return apiError(c, 403, "FORBIDDEN", "grant is disabled in production");
-  }
-
   const user = c.get("user");
   const body = await c.req.json().catch(() => null);
   const parsed = WalletGrantRequestSchema.safeParse(body ?? {});
@@ -226,10 +236,22 @@ player.post("/wallet/grant", requirePlatformSession, async (c) => {
     return apiError(c, 400, "INVALID_BODY", "Invalid grant request");
   }
 
-  const referenceId = `grant_${user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const environment = parsed.data.environment;
+
+  if (process.env.NODE_ENV === "production" && environment !== "sandbox") {
+    return apiError(
+      c,
+      403,
+      "FORBIDDEN",
+      "grant is disabled in production for live wallets. Use environment: 'sandbox' for test funds.",
+    );
+  }
+
+  const referenceId = `grant_${user.id}_${environment}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const result = await applyLedgerMutation({
     userId: user.id,
     clientId: "platform",
+    environment,
     type: "credit",
     amountCents: parsed.data.amountCents,
     reason: parsed.data.reason,
@@ -244,6 +266,7 @@ player.post("/wallet/grant", requirePlatformSession, async (c) => {
     txId: result.txId,
     balanceCents: result.balanceCents,
     currency: "HTG" as const,
+    environment,
   });
 });
 

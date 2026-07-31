@@ -20,7 +20,7 @@ export default function HomePage() {
         session.
       </p>
       <p style={{ marginTop: "2rem" }}>
-        <Link href="/launch/sandbox" style={{ color: "#60a5fa" }}>
+        <Link href="/launch/sandbox.sandbox" style={{ color: "#60a5fa" }}>
           Lancer Sandbox →
         </Link>
       </p>

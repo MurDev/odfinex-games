@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { gameClients } from "@odfinex/db";
 
 import { db } from "../db.js";
@@ -17,7 +17,13 @@ gamesRoutes.get("/games", async (c) => {
         isActive: gameClients.isActive,
       })
       .from(gameClients)
-      .where(eq(gameClients.isActive, true));
+      .where(
+        and(
+          eq(gameClients.isActive, true),
+          eq(gameClients.environment, "live"),
+          eq(gameClients.hidden, false),
+        ),
+      );
 
     return c.json({ games: rows });
   } catch (err) {

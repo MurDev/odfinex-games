@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { and, eq, gt } from "drizzle-orm";
 import { gameClients, launchTokens, users } from "@odfinex/db";
-import type { User } from "@odfinex/shared";
+import type { User, WalletEnvironment } from "@odfinex/shared";
 
 import { db } from "../db.js";
 import { apiError } from "../lib/errors.js";
@@ -11,6 +11,7 @@ import { toPublicUser } from "../lib/user.js";
 export type LaunchAuthVariables = {
   user: User;
   clientId: string;
+  environment: WalletEnvironment;
   walletEnabled: boolean;
   /** Raw request body (set by requireClientSignature for re-use in route handler) */
   rawBody?: string;
@@ -29,6 +30,7 @@ export const requireLaunchToken = createMiddleware<{
     .select({
       user: users,
       clientId: launchTokens.clientId,
+      environment: gameClients.environment,
       walletEnabled: gameClients.walletEnabled,
     })
     .from(launchTokens)
@@ -49,6 +51,7 @@ export const requireLaunchToken = createMiddleware<{
 
   c.set("user", toPublicUser(row.user));
   c.set("clientId", row.clientId);
+  c.set("environment", row.environment);
   c.set("walletEnabled", row.walletEnabled);
   await next();
 });

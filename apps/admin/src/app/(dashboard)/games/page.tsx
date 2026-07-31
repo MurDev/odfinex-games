@@ -3,7 +3,7 @@ import { adminServerFetch } from "@/lib/server-fetch";
 import { formatHtg } from "@/lib/api";
 import type { AdminGameStats } from "@odfinex/shared";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { NewGameButton } from "./new-game-button";
 
@@ -56,6 +56,7 @@ export default async function GamesPage() {
               <TableRow>
                 <TableHead>Client ID</TableHead>
                 <TableHead>Nom</TableHead>
+                <TableHead>Environnement</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Wallet</TableHead>
                 <TableHead>Secret</TableHead>
@@ -74,34 +75,39 @@ export default async function GamesPage() {
               ) : (
                 games.map((game) => (
                   <TableRow key={game.clientId}>
-                    <TableCell className="font-mono text-xs">{game.clientId}</TableCell>
-                    <TableCell className="font-medium">{game.name}</TableCell>
-                    <TableCell>
-                      <Badge variant={game.isActive ? "success" : "secondary"}>
-                        {game.isActive ? "Actif" : "Inactif"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={game.walletEnabled ? "success" : "outline"}>
-                        {game.walletEnabled ? "Active" : "Desactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={game.hasClientSecret ? "success" : "outline"}>
-                        {game.hasClientSecret ? "Configure" : "Absent"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{game.playerCount}</TableCell>
-                    <TableCell>{formatHtg(game.volumeCents)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/games/${game.clientId}`}>
-                          <ExternalLink className="mr-1 h-3 w-3" />
-                          Gerer
-                        </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                  <TableCell className="font-mono text-xs">{game.clientId}</TableCell>
+                  <TableCell className="font-medium">{game.name}</TableCell>
+                  <TableCell>
+                    <Badge variant={game.environment === "live" ? "default" : "secondary"}>
+                      {game.environment === "live" ? "Live" : "Sandbox"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={game.isActive ? "success" : "secondary"}>
+                      {game.isActive ? "Actif" : "Inactif"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={game.walletEnabled ? "success" : "outline"}>
+                      {game.walletEnabled ? "Active" : "Desactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={game.hasClientSecret ? "success" : "outline"}>
+                      {game.hasClientSecret ? "Configure" : "Absent"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{game.playerCount}</TableCell>
+                  <TableCell>{formatHtg(game.volumeCents)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/games/${game.clientId}`}>
+                        <ExternalLink className="mr-1 h-3 w-3" />
+                        Gerer
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
                 ))
               )}
             </TableBody>

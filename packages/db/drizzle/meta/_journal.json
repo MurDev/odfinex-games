@@ -29,6 +29,13 @@
       "when": 1785382000000,
       "tag": "0003_client_secret",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785460000000,
+      "tag": "0004_environment",
+      "breakpoints": true
     }
   ]
 }
