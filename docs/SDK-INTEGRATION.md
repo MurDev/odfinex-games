@@ -1,7 +1,6 @@
 # SDK Integration — `@odfinex/games-sdk`
 
-Guide pour brancher un jeu externe sur Odfinex Games (**Phase 1 — identité uniquement**).  
-Wallet / `getBalance` / debit / credit = **Phase 2** (pas encore disponibles).
+Guide pour brancher un jeu externe sur Odfinex Games (**Phase 1 identité + Phase 2 wallet**).
 
 ## Prérequis
 
@@ -43,6 +42,7 @@ Upsert via seed ([`packages/db/src/seed.ts`](../packages/db/src/seed.ts)) ou ins
 | `launchUrl` | URL de redirection après launch (ex. `http://localhost:3002`) |
 | `redirectUrls` | Allowlist d’origines ; **doit** inclure l’origine de `launchUrl` |
 | `isActive` | `true` pour apparaître dans `GET /v1/games` |
+| `walletEnabled` | `true` pour autoriser `debit` / `credit` via le SDK |
 
 Puis `pnpm db:seed`.
 
@@ -88,6 +88,7 @@ const client = new OdfinexGamesClient({
   baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000",
   clientId: "duelpion",
   webUrl: process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000",
+  clientSecret: process.env.ODFINEX_CLIENT_SECRET, // requis pour debit/credit (S2S)
   // sessionToken optionnel : sinon lit ?token= dans l’URL (browser)
 });
 
@@ -110,6 +111,33 @@ const login = client.loginUrl({
 
 `getSession()` renvoie `{ user, clientId, expiresAt }` — utile pour stocker l’expiry.
 
+## Wallet (Phase 2 + S2S)
+
+Prérequis : `game_client.walletEnabled === true`, un launch token valide, et `clientSecret` configure dans le SDK (S2S).
+
+```ts
+const bal = await client.getBalance();
+// { balanceCents: number, currency: "HTG" }
+
+await client.debit({
+  amountCents: 100, // 1 HTG
+  reason: "bet",
+  referenceId: `match-${matchId}-bet`, // unique par jeu
+});
+
+await client.credit({
+  amountCents: 200,
+  reason: "win",
+  referenceId: `match-${matchId}-win`,
+});
+```
+
+- Montants en **centimes HTG** (entiers).
+- Rejouer le même `referenceId` avec le même payload renvoie le même résultat (idempotent).
+- Crédit de test joueur : page web `/wallet` → « Crédit test » (`POST /v1/wallet/grant`, non-prod).
+
+Demo : `http://localhost:3001/launch/sandbox` (boutons Debit/Credit).
+
 ## Erreurs courantes
 
 | Code / symptôme | Cause | Action |
@@ -119,8 +147,15 @@ const login = client.loginUrl({
 | Fetch `TypeError` / CORS | Origine jeu absente de CORS | Ajouter à `CORS_ORIGINS`, redémarrer API |
 | `GAME_NOT_FOUND` | `clientId` inconnu ou inactif | Seed / activer `game_client` |
 | `LAUNCH_URL_NOT_ALLOWED` | Origine `launchUrl` hors allowlist | Étendre `redirectUrls` |
+| `GAME_NOT_ALLOWED` | `walletEnabled` false | Activer sur `game_client` |
+| `MISSING_CLIENT_SECRET` | Headers S2S manquants (`x-client-secret`, `x-timestamp`, `x-client-signature`) | Configurer `clientSecret` dans le SDK |
+| `INVALID_CLIENT_SECRET` | Secret invalide ou secret non configure sur le jeu | Generer un secret dans l'admin UI |
+| `INVALID_TIMESTAMP` | Horloge du serveur jeu dephasee > 5 min | Synchroniser NTP |
+| `INVALID_SIGNATURE` | HMAC body+timestamp ne correspond pas | Verifier l'algo HMAC-SHA256 |
+| `INSUFFICIENT_FUNDS` | Solde < debit | Grant test / crédit win |
+| `IDEMPOTENCY_CONFLICT` | Même `referenceId`, autre payload | Nouveau `referenceId` |
 
-## API utile (Phase 1)
+## API utile
 
 | Méthode | Route | Auth |
 |---------|-------|------|
@@ -128,11 +163,16 @@ const login = client.loginUrl({
 | `POST` | `/v1/launch` | Session plateforme |
 | `GET` | `/v1/games` | — |
 | `GET` | `/v1/me` | Session plateforme |
+| `GET` | `/v1/wallet` | Launch **ou** session |
+| `POST` | `/v1/wallet/debit` | Launch + HMAC S2S (`clientSecret`) |
+| `POST` | `/v1/wallet/credit` | Launch + HMAC S2S (`clientSecret`) |
+| `GET` | `/v1/wallet/transactions` | Session |
+| `POST` | `/v1/wallet/grant` | Session, non-prod |
 
-## Hors scope Phase 1
+## Hors scope (plus tard)
 
-- `getBalance()`, debit, credit, ledger
 - Publication npm du SDK
 - Domaines production (`odfinexgames`, `play.odfinexgames`)
+- MonCash dépôts / retraits
 
-Voir aussi : [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`PHASE-1.md`](./PHASE-1.md), [`SECURITY-PHASE-1.md`](./SECURITY-PHASE-1.md).
+Voir aussi : [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`PHASE-1.md`](./PHASE-1.md), [`PHASE-2.md`](./PHASE-2.md), [`SECURITY-PHASE-2.md`](./SECURITY-PHASE-2.md).

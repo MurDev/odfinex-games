@@ -15,6 +15,7 @@ const sandbox = {
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3001/sandbox",
   ],
+  walletEnabled: true,
 };
 
 const duelpion = {
@@ -27,6 +28,7 @@ const duelpion = {
     "http://127.0.0.1:3002",
     "http://127.0.0.1:3002/",
   ],
+  walletEnabled: true,
 };
 
 for (const game of [sandbox, duelpion]) {
@@ -40,8 +42,13 @@ for (const game of [sandbox, duelpion]) {
         launchUrl: game.launchUrl,
         redirectUrls: game.redirectUrls,
         isActive: true,
+        walletEnabled: game.walletEnabled,
       },
     });
 
-  console.log(`[db] seeded game_client: ${game.clientId} →`, game.launchUrl);
+  console.log(
+    `[db] seeded game_client: ${game.clientId} →`,
+    game.launchUrl,
+    `(wallet=${game.walletEnabled})`,
+  );
 }

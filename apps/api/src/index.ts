@@ -8,6 +8,8 @@ import { meRoutes } from "./routes/me.js";
 import { launchRoutes } from "./routes/launch.js";
 import { sessionRoutes } from "./routes/session.js";
 import { gamesRoutes } from "./routes/games.js";
+import { walletRoutes } from "./routes/wallet.js";
+import { adminRoutes } from "./routes/admin.js";
 
 const app = new Hono();
 const port = Number(process.env.PORT ?? 4000);
@@ -49,6 +51,18 @@ app.get("/", (c) =>
       "POST /v1/launch",
       "GET /v1/session",
       "GET /v1/games",
+      "GET /v1/wallet",
+      "POST /v1/wallet/debit",
+      "POST /v1/wallet/credit",
+      "GET /v1/wallet/transactions",
+      "POST /v1/wallet/grant",
+      "GET /v1/admin/stats",
+      "GET /v1/admin/games",
+      "POST /v1/admin/games",
+      "PATCH /v1/admin/games/:clientId",
+      "GET /v1/admin/players",
+      "GET /v1/admin/players/:id",
+      "GET /v1/admin/transactions",
     ],
   }),
 );
@@ -58,6 +72,8 @@ v1.route("/", meRoutes);
 v1.route("/", launchRoutes);
 v1.route("/", sessionRoutes);
 v1.route("/", gamesRoutes);
+v1.route("/", walletRoutes);
+v1.route("/", adminRoutes);
 app.route("/v1", v1);
 
 export { app };

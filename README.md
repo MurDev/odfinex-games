@@ -9,7 +9,7 @@ Un **sandbox local** vit dans `apps/play` pour valider le flux launch / SDK (mas
 |---|---|---|
 | `odfinexgames` | `apps/web` | Catalogue, login Google, profil |
 | `play.odfinexgames` | `apps/play` | Launch session → jeu / sandbox |
-| API | `apps/api` | Identity, launch tokens, game registry |
+| API | `apps/api` | Identity, launch tokens, game registry, wallet |
 | Admin | `apps/admin` | Ops (scaffold) |
 
 ## Prérequis
@@ -45,12 +45,14 @@ pnpm --filter @odfinex/play dev   # :3001
 | sandbox SDK | http://localhost:3001/sandbox |
 | api health | http://localhost:4000/health |
 | api games | http://localhost:4000/v1/games |
+| wallet (web) | http://localhost:3000/wallet |
 
-## Parcours de test (Phase 1)
+## Parcours de test
 
 1. Ouvre http://localhost:3000 → **Continuer avec Google**
 2. Sur le catalogue, clique **DUELPION** → launch → jeu sur `:3002` avec profil SDK
 3. Ou test SDK seul : http://localhost:3001/launch/sandbox
+4. Wallet : http://localhost:3000/wallet → **Crédit test** → sandbox Debit/Credit
 
 Sans session : `/launch/{clientId}` → redirect login web.
 
@@ -66,7 +68,7 @@ Consommateur de référence hors monorepo : **DUELPION** (`../DUELPION`).
 apps/
   web/      # catalogue + Auth.js (Google)
   play/     # /launch/[clientId] + sandbox SDK
-  api/      # Hono — /v1/me, /launch, /session, /games
+  api/      # Hono — identity + /v1/wallet*
   admin/    # scaffold
 packages/
   shared/   # Zod contracts
@@ -74,8 +76,10 @@ packages/
   sdk/      # @odfinex/games-sdk
 docs/
   PHASE-1.md
+  PHASE-2.md
   SDK-INTEGRATION.md
   SECURITY-PHASE-1.md
+  SECURITY-PHASE-2.md
   STACK.md
   ARCHITECTURE.md
 ```
@@ -86,4 +90,6 @@ docs/
 Suivi : [`docs/PHASE-1.md`](docs/PHASE-1.md).  
 Sécurité : [`docs/SECURITY-PHASE-1.md`](docs/SECURITY-PHASE-1.md).
 
-**Phase 2** (à venir) : wallet / ledger / `getBalance` / debit / credit.
+**Phase 2 — wallet / SDK money : terminée**.  
+Suivi : [`docs/PHASE-2.md`](docs/PHASE-2.md).  
+Sécurité : [`docs/SECURITY-PHASE-2.md`](docs/SECURITY-PHASE-2.md).

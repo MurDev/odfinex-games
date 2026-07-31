@@ -23,22 +23,25 @@ Platform API (:4000)
   POST /v1/launch
   GET  /v1/session
   GET  /v1/games
+  GET/POST /v1/wallet*   (ledger)
         │
         ▼
 Postgres (:55432)
   user, account, session, verification_token
   game_client, launch_token
+  wallet_account, ledger_entry
 ```
 
 ## Principes
 
 1. **Découplage** — aucun moteur de jeu de production dans ce monorepo (sandbox de test OK dans `play`).
-2. **SDK v1** — identité (+ wallet en Phase 2) ; le jeu garde règles et matchmaking.
-3. **Autorité argent** — ledger uniquement côté Platform API (Phase 2).
+2. **SDK** — identité + money ; le jeu garde règles et matchmaking.
+3. **Autorité argent** — ledger uniquement côté Platform API (`FOR UPDATE` + idempotence `referenceId`).
 4. **Auth unique** — Google OAuth sur la plateforme ; les jeux ne gèrent pas le login.
 5. **Launch tokens** — 7 jours, stockés hashés ; le SDK ne voit que le Bearer opaque.
 6. **Allowlist** — `game_client.launchUrl` doit matcher une origine de `redirectUrls`.
 7. **CORS jeux** — origines externes via `CORS_ORIGINS` (ex. `http://localhost:3002`).
+8. **Wallet par jeu** — `game_client.walletEnabled` gate les mutations money.
 
 ## Flux identité (Phase 1)
 
@@ -56,17 +59,17 @@ Login alternatif depuis un jeu : `web/login?returnTo=…&clientId=…` (redirect
 
 | Package | Rôle |
 |---|---|
-| `@odfinex/shared` | Contrats Zod (User, launch, session, erreurs) |
+| `@odfinex/shared` | Contrats Zod (User, launch, session, wallet, erreurs) |
 | `@odfinex/db` | Schéma Drizzle, migrations, seed |
-| `@odfinex/games-sdk` | Client jeux : `getUser`, `getSession`, `loginUrl`, erreurs |
+| `@odfinex/games-sdk` | Client jeux : identité + `getBalance` / `debit` / `credit` |
 
 ## Apps
 
-| App | Rôle Phase 1 |
+| App | Rôle |
 |---|---|
-| `web` | Catalogue, Google auth, `/me` |
-| `play` | Launch + sandbox SDK |
-| `api` | Identity / registry / tokens |
+| `web` | Catalogue, Google auth, `/me`, `/wallet` |
+| `play` | Launch + sandbox SDK (identité + money demo) |
+| `api` | Identity / registry / tokens / ledger |
 | `admin` | Scaffold uniquement |
 
 ## Phases
@@ -74,7 +77,7 @@ Login alternatif depuis un jeu : `web/login?returnTo=…&clientId=…` (redirect
 | Phase | Contenu | Statut |
 |---|---|---|
 | 0 | Squelette monorepo | ✅ |
-| 1 | Identity + SDK auth | ✅ terminée — [`PHASE-1.md`](./PHASE-1.md), [`SDK-INTEGRATION.md`](./SDK-INTEGRATION.md) |
-| 2 | Wallet + SDK money | À venir |
+| 1 | Identity + SDK auth | ✅ — [`PHASE-1.md`](./PHASE-1.md) |
+| 2 | Wallet + SDK money | ✅ — [`PHASE-2.md`](./PHASE-2.md) |
 | 3 | Catalogue web riche | À venir |
 | 4+ | Jeux externes (LudoLakay, …) | En cours hors monorepo (DUELPION) |

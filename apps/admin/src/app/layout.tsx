@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Admin — Odfinex Games",
@@ -12,18 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body
-        style={{
-          margin: 0,
-          minHeight: "100vh",
-          fontFamily:
-            "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-          background: "#0f1419",
-          color: "#e8eef3",
-        }}
-      >
-        {children}
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

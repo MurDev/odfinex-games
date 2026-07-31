@@ -1,10 +1,15 @@
 /**
- * @odfinex/games-sdk — identity client for external games.
+ * @odfinex/games-sdk — identity + wallet client for external games.
  */
 import {
   SessionResponseSchema,
+  WalletBalanceSchema,
+  WalletMutationResponseSchema,
   type SessionResponse,
   type User,
+  type WalletBalance,
+  type WalletMutationRequest,
+  type WalletMutationResponse,
 } from "@odfinex/shared";
 
 export type OdfinexGamesClientOptions = {
@@ -17,6 +22,8 @@ export type OdfinexGamesClientOptions = {
    * If omitted, the SDK reads `token` from the current URL (browser).
    */
   sessionToken?: string;
+  /** Client secret for HMAC-signing wallet mutations (S2S auth). */
+  clientSecret?: string;
   /** Catalogue / login origin for redirect helpers */
   webUrl?: string;
 };
@@ -33,6 +40,29 @@ export class OdfinexGamesError extends Error {
   }
 }
 
+/**
+ * Compute HMAC-SHA256 signature for S2S wallet mutations.
+ * Uses Web Crypto API (browser) or Node.js crypto.
+ */
+async function computeClientSignature(
+  body: string,
+  timestamp: string,
+  clientSecret: string,
+): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(clientSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${body}.${timestamp}`));
+  return Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function readTokenFromUrl(): string | undefined {
   if (typeof window === "undefined") return undefined;
   return new URLSearchParams(window.location.search).get("token") ?? undefined;
@@ -42,12 +72,14 @@ export class OdfinexGamesClient {
   readonly baseUrl: string;
   readonly clientId: string;
   readonly webUrl: string;
+  readonly clientSecret?: string;
   private sessionToken?: string;
 
   constructor(options: OdfinexGamesClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.clientId = options.clientId;
     this.webUrl = (options.webUrl ?? "http://localhost:3000").replace(/\/$/, "");
+    this.clientSecret = options.clientSecret;
     this.sessionToken = options.sessionToken ?? readTokenFromUrl();
   }
 
@@ -63,13 +95,7 @@ export class OdfinexGamesClient {
     return url.toString();
   }
 
-  /** Validate launch token and return the player profile. */
-  async getUser(): Promise<User> {
-    const session = await this.getSession();
-    return session.user;
-  }
-
-  async getSession(): Promise<SessionResponse> {
+  private requireToken(): string {
     if (!this.sessionToken) {
       throw new OdfinexGamesError(
         401,
@@ -77,31 +103,97 @@ export class OdfinexGamesClient {
         "No launch token. Pass sessionToken or include ?token= in the URL.",
       );
     }
+    return this.sessionToken;
+  }
 
+  private async parseError(res: Response, fallback: string): Promise<never> {
+    const json: unknown = await res.json().catch(() => null);
+    const err = json as { error?: { code?: string; message?: string } } | null;
+    throw new OdfinexGamesError(
+      res.status,
+      err?.error?.code ?? "REQUEST_FAILED",
+      err?.error?.message ?? fallback,
+    );
+  }
+
+  /** Validate launch token and return the player profile. */
+  async getUser(): Promise<User> {
+    const session = await this.getSession();
+    return session.user;
+  }
+
+  async getSession(): Promise<SessionResponse> {
+    const token = this.requireToken();
     const res = await fetch(`${this.baseUrl}/v1/session`, {
       headers: {
-        Authorization: `Bearer ${this.sessionToken}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
     });
 
-    const json: unknown = await res.json().catch(() => null);
-
     if (!res.ok) {
-      const err = json as { error?: { code?: string; message?: string } } | null;
-      throw new OdfinexGamesError(
-        res.status,
-        err?.error?.code ?? "REQUEST_FAILED",
-        err?.error?.message ?? `GET /v1/session failed (${res.status})`,
-      );
+      return this.parseError(res, `GET /v1/session failed (${res.status})`);
     }
 
-    return SessionResponseSchema.parse(json);
+    return SessionResponseSchema.parse(await res.json());
   }
 
-  /** Phase 2 — not implemented yet */
-  async getBalance(): Promise<never> {
-    throw new Error("OdfinexGamesClient.getBalance is not implemented yet (Phase 2)");
+  async getBalance(): Promise<WalletBalance> {
+    const token = this.requireToken();
+    const res = await fetch(`${this.baseUrl}/v1/wallet`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `GET /v1/wallet failed (${res.status})`);
+    }
+
+    return WalletBalanceSchema.parse(await res.json());
+  }
+
+  async debit(input: WalletMutationRequest): Promise<WalletMutationResponse> {
+    return this.mutate("debit", input);
+  }
+
+  async credit(input: WalletMutationRequest): Promise<WalletMutationResponse> {
+    return this.mutate("credit", input);
+  }
+
+  private async mutate(
+    kind: "debit" | "credit",
+    input: WalletMutationRequest,
+  ): Promise<WalletMutationResponse> {
+    const token = this.requireToken();
+    const timestamp = Date.now().toString();
+    const body = JSON.stringify(input);
+
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+
+    if (this.clientSecret) {
+      const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+      headers["x-client-secret"] = this.clientSecret;
+      headers["x-timestamp"] = timestamp;
+      headers["x-client-signature"] = signature;
+    }
+
+    const res = await fetch(`${this.baseUrl}/v1/wallet/${kind}`, {
+      method: "POST",
+      headers,
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/wallet/${kind} failed (${res.status})`);
+    }
+
+    return WalletMutationResponseSchema.parse(await res.json());
   }
 }
 
@@ -109,7 +201,13 @@ export {
   HealthResponseSchema,
   UserSchema,
   SessionResponseSchema,
+  WalletBalanceSchema,
+  WalletMutationRequestSchema,
+  WalletMutationResponseSchema,
   type HealthResponse,
   type User,
   type SessionResponse,
+  type WalletBalance,
+  type WalletMutationRequest,
+  type WalletMutationResponse,
 } from "@odfinex/shared";

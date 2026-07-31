@@ -5,6 +5,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /** Auth.js — users */
@@ -16,6 +17,7 @@ export const users = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
+  isAdmin: boolean("is_admin").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
@@ -78,6 +80,8 @@ export const gameClients = pgTable("game_client", {
   launchUrl: text("launch_url").notNull(),
   redirectUrls: text("redirect_urls").array().notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  walletEnabled: boolean("wallet_enabled").notNull().default(false),
+  clientSecretHash: text("client_secret_hash"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
@@ -96,3 +100,33 @@ export const launchTokens = pgTable("launch_token", {
   expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+/** Player wallet — balance in HTG cents (authority: Platform API only) */
+export const walletAccounts = pgTable("wallet_account", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  balanceCents: integer("balance_cents").notNull().default(0),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+/** Immutable ledger lines — idempotent via (clientId, referenceId) */
+export const ledgerEntries = pgTable(
+  "ledger_entry",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    type: text("type").notNull(), // debit | credit
+    amountCents: integer("amount_cents").notNull(),
+    balanceAfterCents: integer("balance_after_cents").notNull(),
+    reason: text("reason").notNull(),
+    referenceId: text("reference_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [unique("ledger_entry_client_ref_unique").on(table.clientId, table.referenceId)],
+);
