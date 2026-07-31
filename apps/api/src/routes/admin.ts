@@ -12,7 +12,7 @@ import {
 import { db } from "../db.js";
 import { apiError } from "../lib/errors.js";
 import { toPublicUser } from "../lib/user.js";
-import type { User } from "@odfinex/shared";
+import type { User, WalletEnvironment } from "@odfinex/shared";
 import { requirePlatformSession, type AuthVariables } from "../middleware/auth.js";
 import { generateClientSecret } from "../lib/signature.js";
 
@@ -41,11 +41,14 @@ async function requireAdmin(c: Parameters<typeof requirePlatformSession>[0], nex
 
 adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) => {
   const [userCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users);
-  const [gameCount] = await db.select({ count: sql<number>`count(*)::int` }).from(gameClients);
+  const [gameCount] = await db
+    .select({ count: sql<number>`count(distinct name)::int` })
+    .from(gameClients);
   const [txCount] = await db.select({ count: sql<number>`count(*)::int` }).from(ledgerEntries);
   const [walletRow] = await db
     .select({ total: sql<number>`coalesce(sum(balance_cents),0)::int` })
-    .from(walletAccounts);
+    .from(walletAccounts)
+    .where(eq(walletAccounts.environment, "live"));
   const [volumeRow] = await db
     .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
     .from(ledgerEntries);
@@ -84,6 +87,7 @@ adminRoutes.get("/admin/games", requirePlatformSession, requireAdmin, async (c) 
       return {
         clientId: g.clientId,
         name: g.name,
+        environment: g.environment as WalletEnvironment,
         launchUrl: g.launchUrl,
         isActive: g.isActive,
         walletEnabled: g.walletEnabled,
@@ -129,6 +133,7 @@ adminRoutes.get("/admin/games/:clientId", requirePlatformSession, requireAdmin, 
   return c.json({
     clientId: game.clientId,
     name: game.name,
+    environment: game.environment as WalletEnvironment,
     launchUrl: game.launchUrl,
     redirectUrls: game.redirectUrls,
     isActive: game.isActive,
@@ -149,7 +154,7 @@ adminRoutes.patch("/admin/games/:clientId", requirePlatformSession, requireAdmin
     return apiError(c, 400, "INVALID_BODY", "Invalid request body");
   }
 
-  const allowed = ["name", "launchUrl", "redirectUrls", "isActive", "walletEnabled"];
+  const allowed = ["name", "launchUrl", "redirectUrls", "isActive", "walletEnabled", "hidden"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = (body as Record<string, unknown>)[key];
@@ -202,20 +207,44 @@ adminRoutes.post("/admin/games", requirePlatformSession, requireAdmin, async (c)
     return apiError(c, 400, "INVALID_BODY", "Invalid request body");
   }
 
-  const { clientId: providedId, name, launchUrl, redirectUrls, isActive, walletEnabled } = body as {
+  const {
+    slug,
+    clientId: providedId,
+    name,
+    launchUrl,
+    redirectUrls,
+    isActive,
+    walletEnabled,
+    environment,
+  } = body as {
+    slug?: string;
     clientId?: string;
     name?: string;
     launchUrl?: string;
     redirectUrls?: string[];
     isActive?: boolean;
     walletEnabled?: boolean;
+    environment?: WalletEnvironment;
   };
 
   if (!name || !launchUrl) {
     return apiError(c, 400, "INVALID_BODY", "name and launchUrl are required");
   }
 
-  const clientId = providedId ?? `game_${randomBytes(4).toString("hex")}`;
+  const env: WalletEnvironment =
+    environment === "sandbox" || environment === "live" ? environment : "live";
+
+  let clientId: string;
+  if (providedId) {
+    clientId = providedId;
+  } else if (slug) {
+    if (!/^[a-z0-9][a-z0-9_-]{0,31}$/i.test(slug)) {
+      return apiError(c, 400, "INVALID_BODY", "slug must match [a-z0-9_-]");
+    }
+    clientId = `${slug}.${env}`;
+  } else {
+    clientId = `game_${randomBytes(4).toString("hex")}.${env}`;
+  }
 
   const existing = await db
     .select({ id: gameClients.id })
@@ -233,6 +262,7 @@ adminRoutes.post("/admin/games", requirePlatformSession, requireAdmin, async (c)
     .values({
       clientId,
       name,
+      environment: env,
       launchUrl,
       redirectUrls: redirectUrls ?? [launchUrl],
       isActive: isActive ?? true,
@@ -271,12 +301,17 @@ adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c
   const playersWithWallet = await Promise.all(
     allUsers.map(async (u) => {
       const walletRows = await db
-        .select({ balance: walletAccounts.balanceCents })
+        .select({
+          balance: walletAccounts.balanceCents,
+          environment: walletAccounts.environment,
+        })
         .from(walletAccounts)
-        .where(eq(walletAccounts.userId, u.id))
-        .limit(1);
+        .where(eq(walletAccounts.userId, u.id));
 
-      const balanceCents = walletRows.length > 0 ? (walletRows[0] as { balance: number }).balance : 0;
+      const live =
+        walletRows.find((r) => r.environment === "live")?.balance ?? 0;
+      const sandbox =
+        walletRows.find((r) => r.environment === "sandbox")?.balance ?? 0;
 
       const [txCount] = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -290,7 +325,8 @@ adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c
         avatarUrl: u.image,
         isAdmin: u.isAdmin ?? false,
         createdAt: u.createdAt.toISOString(),
-        balanceCents,
+        balanceCents: live,
+        sandboxBalanceCents: sandbox,
         transactionCount: txCount?.count ?? 0,
       };
     }),
@@ -311,12 +347,17 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
   if (!user) return apiError(c, 404, "NOT_FOUND", "Player not found");
 
   const walletRows = await db
-    .select()
+    .select({
+      balanceCents: walletAccounts.balanceCents,
+      environment: walletAccounts.environment,
+    })
     .from(walletAccounts)
-    .where(eq(walletAccounts.userId, id))
-    .limit(1);
+    .where(eq(walletAccounts.userId, id));
 
-  const balanceCents = walletRows.length > 0 ? (walletRows[0] as typeof walletRows[number]).balanceCents : 0;
+  const live =
+    walletRows.find((r) => r.environment === "live")?.balanceCents ?? 0;
+  const sandbox =
+    walletRows.find((r) => r.environment === "sandbox")?.balanceCents ?? 0;
 
   const [txCount] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -338,7 +379,8 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
       avatarUrl: user.image,
       isAdmin: user.isAdmin ?? false,
       createdAt: user.createdAt.toISOString(),
-      balanceCents,
+      balanceCents: live,
+      sandboxBalanceCents: sandbox,
       transactionCount: txCount?.count ?? 0,
     },
     transactions: txs.map((tx) => ({
@@ -348,6 +390,7 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
       balanceAfterCents: tx.balanceAfterCents,
       reason: tx.reason,
       clientId: tx.clientId,
+      environment: tx.environment as WalletEnvironment,
       referenceId: tx.referenceId,
       createdAt: tx.createdAt.toISOString(),
     })),
@@ -392,6 +435,7 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
       balanceAfterCents: tx.balanceAfterCents,
       reason: tx.reason,
       clientId: tx.clientId,
+      environment: tx.environment as WalletEnvironment,
       referenceId: tx.referenceId,
       createdAt: tx.createdAt.toISOString(),
     })),

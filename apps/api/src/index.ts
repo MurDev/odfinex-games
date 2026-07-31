@@ -26,7 +26,13 @@ app.use(
   cors({
     origin: [webUrl, playUrl, "http://localhost:5173", ...gameOrigins],
     credentials: true,
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-client-secret",
+      "x-timestamp",
+      "x-client-signature",
+    ],
   }),
 );
 

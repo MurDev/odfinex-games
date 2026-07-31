@@ -25,8 +25,10 @@ export default function SandboxGamePage() {
   useEffect(() => {
     const c = new OdfinexGamesClient({
       baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000",
-      clientId: "sandbox",
+      clientId: process.env.NEXT_PUBLIC_SANDBOX_CLIENT_ID ?? "sandbox.sandbox",
       webUrl: process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000",
+      clientSecret:
+        process.env.NEXT_PUBLIC_SANDBOX_CLIENT_SECRET ?? "sandbox_test_secret_change_me",
     });
     setClient(c);
 
@@ -128,8 +130,8 @@ export default function SandboxGamePage() {
           <p style={{ margin: 0, color: "#f87171" }}>{error}</p>
           <p style={{ margin: "0.75rem 0 0", fontSize: "0.85rem", opacity: 0.7 }}>
             Lance via{" "}
-            <Link href="/launch/sandbox" style={{ color: "#60a5fa" }}>
-              /launch/sandbox
+            <Link href="/launch/sandbox.sandbox" style={{ color: "#60a5fa" }}>
+              /launch/sandbox.sandbox
             </Link>{" "}
             (connecté).
           </p>

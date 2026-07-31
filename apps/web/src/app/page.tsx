@@ -7,18 +7,15 @@ const apiUrl = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http:
 );
 
 const GAME_COPY: Record<string, { blurb: string; accent: string }> = {
-  duelpion: {
+  "duelpion.live": {
     blurb: "Morpion & Gomoku — duels de pions élégants",
     accent: "#14b8a6",
   },
 };
 
-/** Internal / test clients hidden from the public catalogue. */
-const CATALOGUE_HIDDEN = new Set(["sandbox"]);
-
 const FALLBACK_GAMES: GameClient[] = [
   {
-    clientId: "duelpion",
+    clientId: "duelpion.live",
     name: "DUELPION",
     launchUrl: "http://localhost:3002",
     isActive: true,
@@ -32,14 +29,14 @@ async function loadGames(): Promise<GameClient[]> {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = GamesListResponseSchema.parse(await res.json());
-    return data.games.filter((g) => g.isActive && !CATALOGUE_HIDDEN.has(g.clientId));
+    return data.games.filter((g) => g.isActive);
   } catch {
     return FALLBACK_GAMES;
   }
 }
 
 function sortGames(games: GameClient[]): GameClient[] {
-  const order = ["duelpion"];
+  const order = ["duelpion.live"];
   return [...games].sort((a, b) => {
     const ai = order.indexOf(a.clientId);
     const bi = order.indexOf(b.clientId);

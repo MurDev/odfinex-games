@@ -68,6 +68,11 @@ export const GamesListResponseSchema = z.object({
 
 export type GamesListResponse = z.infer<typeof GamesListResponseSchema>;
 
+/** Wallet environment — sandbox (test funds) vs live (real funds) */
+export const WalletEnvironmentSchema = z.enum(["sandbox", "live"]);
+
+export type WalletEnvironment = z.infer<typeof WalletEnvironmentSchema>;
+
 /** Wallet — HTG cents only (no floats) */
 export const WalletBalanceSchema = z.object({
   balanceCents: z.number().int().nonnegative(),
@@ -95,6 +100,7 @@ export type WalletMutationResponse = z.infer<typeof WalletMutationResponseSchema
 export const WalletGrantRequestSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_00),
   reason: z.string().min(1).max(64).optional().default("grant"),
+  environment: WalletEnvironmentSchema.optional().default("live"),
 });
 
 export type WalletGrantRequest = z.infer<typeof WalletGrantRequestSchema>;
@@ -106,6 +112,7 @@ export const LedgerEntrySchema = z.object({
   balanceAfterCents: z.number().int().nonnegative(),
   reason: z.string(),
   clientId: z.string(),
+  environment: WalletEnvironmentSchema,
   referenceId: z.string(),
   createdAt: z.string().datetime(),
 });
@@ -136,6 +143,7 @@ export type AdminStats = z.infer<typeof AdminStatsSchema>;
 export const AdminGameStatsSchema = z.object({
   clientId: z.string(),
   name: z.string(),
+  environment: WalletEnvironmentSchema,
   launchUrl: z.string(),
   isActive: z.boolean(),
   walletEnabled: z.boolean(),
@@ -158,6 +166,19 @@ export const AdminGameUpdateSchema = z.object({
 });
 
 export type AdminGameUpdate = z.infer<typeof AdminGameUpdateSchema>;
+
+export const AdminGameCreateSchema = z.object({
+  slug: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/i).optional(),
+  clientId: z.string().min(1).optional(),
+  name: z.string().min(1),
+  environment: WalletEnvironmentSchema.optional().default("live"),
+  launchUrl: z.string().url(),
+  redirectUrls: z.array(z.string()).optional(),
+  isActive: z.boolean().optional(),
+  walletEnabled: z.boolean().optional(),
+});
+
+export type AdminGameCreate = z.infer<typeof AdminGameCreateSchema>;
 
 export const AdminPlayerSchema = z.object({
   id: z.string(),

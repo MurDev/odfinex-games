@@ -58,6 +58,9 @@ export default async function GameDetailPage({ params }: { params: Promise<{ cli
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{game.name}</h1>
+            <Badge variant={game.environment === "live" ? "default" : "secondary"}>
+              {game.environment === "live" ? "Live" : "Sandbox"}
+            </Badge>
             <Badge variant={game.isActive ? "success" : "secondary"}>
               {game.isActive ? "Actif" : "Inactif"}
             </Badge>

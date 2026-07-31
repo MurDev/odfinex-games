@@ -1,12 +1,15 @@
 import {
   boolean,
   integer,
+  pgEnum,
   pgTable,
   primaryKey,
   text,
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
+
+export const environmentEnum = pgEnum("game_environment", ["sandbox", "live"]);
 
 /** Auth.js — users */
 export const users = pgTable("user", {
@@ -77,6 +80,8 @@ export const gameClients = pgTable("game_client", {
     .$defaultFn(() => crypto.randomUUID()),
   clientId: text("client_id").notNull().unique(),
   name: text("name").notNull(),
+  environment: environmentEnum("environment").notNull().default("live"),
+  hidden: boolean("hidden").notNull().default(false),
   launchUrl: text("launch_url").notNull(),
   redirectUrls: text("redirect_urls").array().notNull(),
   isActive: boolean("is_active").notNull().default(true),
@@ -102,13 +107,20 @@ export const launchTokens = pgTable("launch_token", {
 });
 
 /** Player wallet — balance in HTG cents (authority: Platform API only) */
-export const walletAccounts = pgTable("wallet_account", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
-  balanceCents: integer("balance_cents").notNull().default(0),
-  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+export const walletAccounts = pgTable(
+  "wallet_account",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    environment: environmentEnum("environment").notNull().default("live"),
+    balanceCents: integer("balance_cents").notNull().default(0),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.environment] }),
+  ],
+);
 
 /** Immutable ledger lines — idempotent via (clientId, referenceId) */
 export const ledgerEntries = pgTable(
@@ -121,6 +133,7 @@ export const ledgerEntries = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     clientId: text("client_id").notNull(),
+    environment: environmentEnum("environment").notNull().default("live"),
     type: text("type").notNull(), // debit | credit
     amountCents: integer("amount_cents").notNull(),
     balanceAfterCents: integer("balance_after_cents").notNull(),
