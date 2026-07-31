@@ -2,6 +2,21 @@
 
 ## Vue d’ensemble
 
+### Production
+
+```text
+Vercel                           Railway
+├── odfinex-web.vercel.app       ├── odfinex-api-production.up.railway.app  (/health)
+├── odfinex-admin.vercel.app     │     Hono : identity, launch, game registry, wallet
+└── odfinex-play.vercel.app      └── Postgres 16 (volume persisté)
+        │
+        │  API_URL / NEXT_PUBLIC_API_URL
+        ▼
+   Platform API
+```
+
+### Local
+
 ```text
 odfinexgames (web :3000)
   Auth.js Google → session DB (cookie authjs.session-token)
@@ -70,7 +85,12 @@ Login alternatif depuis un jeu : `web/login?returnTo=…&clientId=…` (redirect
 | `web` | Catalogue, Google auth, `/me`, `/wallet` |
 | `play` | Launch + sandbox SDK (identité + money demo) |
 | `api` | Identity / registry / tokens / ledger |
-| `admin` | Scaffold uniquement |
+| `admin` | Ops (jeux, joueurs, transactions) |
+
+## Déploiement
+
+Voir [`DEPLOYMENT.md`](./DEPLOYMENT.md) : Vercel (web/admin/play), Railway (`odfinex-api` + Postgres),
+git flow `developement → main`, CI GitHub Actions, env vars par environnement.
 
 ## Phases
 
@@ -80,4 +100,6 @@ Login alternatif depuis un jeu : `web/login?returnTo=…&clientId=…` (redirect
 | 1 | Identity + SDK auth | ✅ — [`PHASE-1.md`](./PHASE-1.md) |
 | 2 | Wallet + SDK money | ✅ — [`PHASE-2.md`](./PHASE-2.md) |
 | 3 | Catalogue web riche | À venir |
-| 4+ | Jeux externes (LudoLakay, …) | En cours hors monorepo (DUELPION) |
+| 4+ | Jeux externes (DUELPION, …) | Intégration SDK en cours (hors monorepo) |
+
+Suivi global : [`ROADMAP.md`](./ROADMAP.md).

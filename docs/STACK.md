@@ -15,15 +15,26 @@
 | Tests | Vitest |
 | Runtime Node | 22 (`.nvmrc`) |
 
+## Production (déployé — juillet 2026)
+
+| Couche | Choix |
+|---|---|
+| DB hébergée | Postgres 16 géré par Railway (volume persisté, region sfo) |
+| Deploy front | Vercel (web, admin, play — git integration) |
+| Deploy API | Railway (`Dockerfile.api`, healthcheck `/health`) |
+| CI/CD | GitHub Actions (lint/typecheck/test/build) + deploys auto Vercel |
+| Cache turbo | Remote cache Vercel (`TURBO_TOKEN` / `TURBO_TEAM` en secrets GitHub) |
+
+Détails : [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
 ## Prévu (phases suivantes)
 
 | Couche | Choix prévu |
 |---|---|
-| DB hébergée | Neon (ou équivalent) |
-| Deploy front | Vercel |
-| Deploy API | Railway |
 | Cache / sessions scale | Redis (quand nécessaire) |
-| Wallet | Ledger Postgres + APIs debit/credit idempotents (Phase 2) |
+| Wallet | Ledger Postgres + APIs debit/credit idempotents (Phase 2) — fait, reste l'activation par jeu |
+| Domaine perso | `odfinexgames` / `play.odfinexgames` (Vercel custom domains) |
+| Paiements | MonCash dépôts / retraits |
 
 ## Notes locales
 
