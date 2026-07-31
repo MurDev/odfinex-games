@@ -21,13 +21,13 @@
 | 12 | Intégration SDK dans DUELPION | ✅ | Dépendances npm, clientId `duelpion.live` / `duelpion.sandbox`, S2S crédit sur victoire |
 | 13 | Jeux créés en prod | ✅ | `sandbox` (hidden) + `duelpion` en sandbox **et** live, `walletEnabled=true` |
 | 14 | Repo + CI DUELPION | ✅ | `MurDev/duelpion-web` (main = web app, `legacy-v1` = ancien), Dockerfile serveur |
-| 15 | Déployer DUELPION | 🚧 | Front Vercel en ligne (`duelpion-web.vercel.app`) ; serveur Railway sur volume persisté, en attente du package fix |
+| 15 | Déployer DUELPION | ✅ | Front Vercel en ligne (`duelpion-web.vercel.app`) ; serveur Railway sur volume persisté (`duelpion-production.up.railway.app`), lockfile npm 10 en sync |
 
 ## À faire
 
 | Priorité | Élément | Statut | Détail |
 |---|---|---|---|
-| **P1** | **Vérifier le flux S2S complet en prod** | À faire | launch → token → mutation wallet signée (et non signée refusée en 401), isolation sandbox/live |
+| **P1** | **Vérifier le flux S2S complet en prod** | ✅ | Validé : launch → token → mutation wallet signée (non signée 401, mauvais secret 403, timestamp périmé 401), isolation sandbox/live OK |
 | P2 | Domaine personnalisé | À faire | `odfinexgames` → web, `play.odfinexgames` → play (Vercel custom domain) |
 | P3 | Paiements MonCash | À faire | Dépôts / retraits sur le wallet |
 | P4 | Catalogue web riche (Phase 3) | À faire | Listes, détails jeu, profils joueurs |
@@ -44,3 +44,6 @@
 - **31 juillet 2026** : modèle 2 environnements implémenté et déployé (migration `0004`, wallet isolé,
   grant sandbox-only en prod) ; packages npm `@odfinex/*` publiés ; jeu `duelpion.live` créé en prod ;
   front DUELPION déployé sur Vercel, serveur déployé sur Railway (volume persisté).
+- **31 juillet 2026** : build Railway DUELPION réparé (lockfile régénéré avec npm 10, version de `node:22-slim`) ;
+  flux S2S prod validé E2E : `/v1/session`, `/v1/wallet` (crédit/débit signés), refus 401/403 sans signature,
+  isolation sandbox/live confirmée.
