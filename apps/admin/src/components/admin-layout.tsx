@@ -142,6 +142,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
+                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
                 <a href="/api/auth/signout">
                   <LogOut className="mr-2 h-4 w-4" />
                   Deconnexion

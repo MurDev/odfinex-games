@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import Link from "next/link";
 
 const apiUrl = (
   process.env.API_URL ??
@@ -47,12 +48,12 @@ export default async function Header() {
         zIndex: 10,
       }}
     >
-      <a
+      <Link
         href="/"
         style={{ fontWeight: 700, letterSpacing: "0.05em", color: "#e8eef3", textDecoration: "none" }}
       >
         Odfinex Games
-      </a>
+      </Link>
 
       <nav style={{ display: "flex", alignItems: "center", gap: "1.25rem", fontSize: "0.9rem" }}>
         {user ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   OdfinexGamesClient,
   OdfinexGamesError,
@@ -127,9 +128,9 @@ export default function SandboxGamePage() {
           <p style={{ margin: 0, color: "#f87171" }}>{error}</p>
           <p style={{ margin: "0.75rem 0 0", fontSize: "0.85rem", opacity: 0.7 }}>
             Lance via{" "}
-            <a href="/launch/sandbox" style={{ color: "#60a5fa" }}>
+            <Link href="/launch/sandbox" style={{ color: "#60a5fa" }}>
               /launch/sandbox
-            </a>{" "}
+            </Link>{" "}
             (connecté).
           </p>
         </div>

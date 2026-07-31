@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function HomePage() {
   return (
     <main
@@ -18,9 +20,9 @@ export default function HomePage() {
         session.
       </p>
       <p style={{ marginTop: "2rem" }}>
-        <a href="/launch/sandbox" style={{ color: "#60a5fa" }}>
+        <Link href="/launch/sandbox" style={{ color: "#60a5fa" }}>
           Lancer Sandbox →
-        </a>
+        </Link>
       </p>
     </main>
   );

@@ -21,12 +21,12 @@ const db = createDb(requireEnv("DATABASE_URL"));
 const config = {
   secret: requireEnv("AUTH_SECRET"),
   trustHost: true,
-  adapter: DrizzleAdapter(db as any, {
+  adapter: DrizzleAdapter(db as Parameters<typeof DrizzleAdapter>[0], {
     usersTable: users,
     accountsTable: accounts,
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
-  } as any),
+  }),
   session: { strategy: "database" },
   pages: {
     signIn: "/login",

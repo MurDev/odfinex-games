@@ -26,6 +26,7 @@ export default async function DashboardLayout({
         <div className="text-center">
           <h1 className="text-2xl font-bold">Acces refuse</h1>
           <p className="mt-2 text-muted-foreground">Vous n&apos;avez pas les droits administrateur.</p>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/api/auth/signout" className="mt-4 inline-block text-sm text-primary hover:underline">
             Deconnexion
           </a>
