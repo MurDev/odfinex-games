@@ -123,3 +123,32 @@ L'API verifie :
 - `getUser()`, `getSession()`, `getBalance()` : toujours accessibles avec le launch token seul (lecture seule)
 - Login, launch, catalogue : inchange
 - Pour les jeux sans wallet (`walletEnabled: false`) : pas besoin de `client_secret`
+
+---
+
+## Évolution : modèle 2 environnements (sandbox / live)
+
+> **Statut** : décision, non implémenté. Suivi : [`ROADMAP.md`](./ROADMAP.md).
+
+Pour suivre le modèle des grandes plateformes (Stripe, PayPal, …), chaque jeu exposera
+**deux environnements**, chacun avec **sa propre paire `clientId` / `client_secret`** :
+
+| Environnement | Usage | Credentials |
+|---|---|---|
+| `sandbox` | Développement / tests du jeu | paire 1 (`clientId_sandbox` + `client_secret_sandbox`) |
+| `live` | Production (vrais joueurs, vrai argent) | paire 2 (`clientId_live` + `client_secret_live`) |
+
+### Implications à prévoir
+
+- **Schema `game_client`** : ajouter un champ `environment` (`sandbox` | `live`) ou restructurer en
+  « un jeu = une fiche + 2 credentials ».
+- **`clientId`** : préfixé par environnement (ex. `duelpion.sandbox`, `duelpion.live`) ou distinct
+  par paire, l'essentiel étant que chaque paire de credentials est scellée à un environnement.
+- **`launchUrl` / `redirectUrls`** : par environnement (`http://localhost:3002` pour sandbox,
+  `https://duelpion.vercel.app` pour live).
+- **Admin UI** : onglet ou section « Environnements » sur la fiche jeu, boutons
+  « Générer un secret » par environnement.
+- **SDK** : le développeur choisit la paire à embarquer selon son environnement de build
+  (`ODFINEX_CLIENT_ID` + `ODFINEX_CLIENT_SECRET` par env).
+- **Sandbox** : transactions marquées sans valeur réelle (déjà le cas via `POST /v1/wallet/grant`).
+- **Sécurité** : le secret `live` ne doit jamais apparaître en sandbox ; rotation indépendante par paire.

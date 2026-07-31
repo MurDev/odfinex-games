@@ -3,14 +3,24 @@
 Plateforme multi-jeux d’Odfinex : identité, catalogue et SDK pour les jeux externes (DUELPION, LudoLakay, …).
 
 **Aucun moteur de jeu de production dans ce repo.** Les jeux consomment `@odfinex/games-sdk`.  
-Un **sandbox local** vit dans `apps/play` pour valider le flux launch / SDK (masqué du catalogue public).
+Un **sandbox** vit dans `apps/play` pour valider le flux launch / SDK (masqué du catalogue public).
 
-| Domaine | App | Rôle |
+## Production (en ligne)
+
+| App | URL | Rôle |
 |---|---|---|
-| `odfinexgames` | `apps/web` | Catalogue, login Google, profil |
-| `play.odfinexgames` | `apps/play` | Launch session → jeu / sandbox |
-| API | `apps/api` | Identity, launch tokens, game registry, wallet |
-| Admin | `apps/admin` | Ops (scaffold) |
+| web | https://odfinex-web.vercel.app | Catalogue, login Google, profil |
+| admin | https://odfinex-admin.vercel.app | Ops (jeux, joueurs, transactions) |
+| play | https://odfinex-play.vercel.app | Launch session → jeu / sandbox |
+| API | https://odfinex-api-production.up.railway.app | Identity, launch tokens, game registry, wallet |
+
+Déploiement complet : [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) · Suivi : [`docs/ROADMAP.md`](docs/ROADMAP.md)
+
+---
+
+## Développement local
+
+### Prérequis
 
 ## Prérequis
 
@@ -69,15 +79,18 @@ apps/
   web/      # catalogue + Auth.js (Google)
   play/     # /launch/[clientId] + sandbox SDK
   api/      # Hono — identity + /v1/wallet*
-  admin/    # scaffold
+  admin/    # ops (jeux, joueurs, transactions)
 packages/
   shared/   # Zod contracts
   db/       # Drizzle + migrations + seed
   sdk/      # @odfinex/games-sdk
 docs/
+  DEPLOYMENT.md      # structure de déploiement (Vercel + Railway)
+  ROADMAP.md         # fait / à faire
   PHASE-1.md
   PHASE-2.md
   SDK-INTEGRATION.md
+  S2S-AUTH.md
   SECURITY-PHASE-1.md
   SECURITY-PHASE-2.md
   STACK.md
@@ -93,3 +106,9 @@ Sécurité : [`docs/SECURITY-PHASE-1.md`](docs/SECURITY-PHASE-1.md).
 **Phase 2 — wallet / SDK money : terminée**.  
 Suivi : [`docs/PHASE-2.md`](docs/PHASE-2.md).  
 Sécurité : [`docs/SECURITY-PHASE-2.md`](docs/SECURITY-PHASE-2.md).
+
+**Déploiement : production en ligne** (Vercel + Railway + Postgres).  
+Suivi : [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+**Prochaine étape : intégration SDK dans DUELPION** (priorité), puis modèle admin 2 environnements
+(sandbox/live) pour chaque jeu. Détails : [`docs/ROADMAP.md`](docs/ROADMAP.md).
