@@ -21,7 +21,6 @@ const db = createDb(requireEnv("DATABASE_URL"));
 const config = {
   secret: requireEnv("AUTH_SECRET"),
   trustHost: true,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   adapter: DrizzleAdapter(db as Parameters<typeof DrizzleAdapter>[0], {
     usersTable: users,
     accountsTable: accounts,
