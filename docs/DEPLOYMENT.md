@@ -10,9 +10,9 @@ GitHub (MurDev/odfinex-games)
    ├─ GitHub Actions (CI) : typecheck, lint, test, build
    └─ Vercel (git integration) : deploys des apps Next.js
         │
-        ├── odfinex-web    → https://odfinex-web.vercel.app      (catalogue + Google OAuth)
-        ├── odfinex-admin  → https://odfinex-admin.vercel.app    (ops, admin)
-        └── odfinex-play   → https://odfinex-play.vercel.app     (launch → jeux / sandbox)
+         ├── odfinex-web    → https://odfinex-web.vercel.app      (catalogue + Google OAuth + launch)
+         ├── odfinex-admin  → https://odfinex-admin.vercel.app    (ops, admin)
+         └── odfinex-play   → https://odfinex-play.vercel.app     (surface sandbox, lit ?token=)
         │
         └── appelent l'API via API_URL / NEXT_PUBLIC_API_URL
              │
@@ -37,7 +37,7 @@ DUELPION (web app)
 |---|---|---|---|
 | `odfinex-web` | Vercel | Catalogue, login Google, profil | https://odfinex-web.vercel.app |
 | `odfinex-admin` | Vercel | Admin (jeux, joueurs, transactions) | https://odfinex-admin.vercel.app |
-| `odfinex-play` | Vercel | `/launch/[clientId]` + sandbox SDK | https://odfinex-play.vercel.app |
+| `odfinex-play` | Vercel | Surface sandbox SDK (lit `?token=` depuis l'URL) | https://odfinex-play.vercel.app |
 | `odfinex-api` | Railway | Hono API (identity, launch, wallet) | https://odfinex-api-production.up.railway.app |
 | Postgres | Railway | Base de données | interne, service `Postgres` |
 | `duelpion-web` | Vercel | Front DUELPION (Next.js + Phaser) | https://duelpion-web.vercel.app |
@@ -157,6 +157,12 @@ Chaque jeu expose **2 paires `clientId`/`client_secret`** : `{slug}.sandbox` et 
 
 ## Notes opérationnelles
 
+- **Launch / login** : le launch vit sur `odfinex-web` (`/launch/{clientId}`) car il lit le
+  cookie de session Auth.js posé par `web`. `odfinex-play/launch/{clientId}` redirige vers
+  `web/launch/{clientId}`. En production `*.vercel.app` est un **public suffix** : les cookies
+  ne traversent pas les sous-domaines, donc `play` ne peut **jamais** lire la session de `web`
+  (cause de la boucle ERR_TOO_MANY_REDIRECTS corrigée le 31/07). Le launch token passe par
+  l'URL (`?token=`), pas par un cookie.
 - **Login Google** : les callback URIs enregistrées côté Google (console) :
   - `https://odfinex-web.vercel.app/api/auth/callback/google`
   - `https://odfinex-admin.vercel.app/api/auth/callback/google`

@@ -15,8 +15,8 @@ Mettre en place l’**identité joueur** sur la plateforme Odfinex Games et expo
 | Auth par défaut | **Google OAuth** (Auth.js) — pas d’email/mot de passe en Phase 1 |
 | Session plateforme | **Database sessions** Auth.js (table `session`) |
 | Compte joueur | **Unique** — créé au 1er login Google |
-| Entrée principale | Catalogue `web` → `play/launch/[clientId]` → jeu (+ `?token=`) |
-| Entrée alternative | Login depuis un jeu / `play/launch/{clientId}` |
+| Entrée principale | Catalogue `web` → `web/launch/[clientId]` → jeu (+ `?token=`) |
+| Entrée alternative | Login depuis un jeu → `web/launch/{clientId}` |
 | Launch token | Opaque, **7 jours**, hash SHA-256 en DB (`launch_token`) |
 | Périmètre SDK v1 | **Identité uniquement** — pas de wallet (Phase 2) |
 | Jeux | **Hors monorepo** (sauf sandbox local de test dans `apps/play`) |
@@ -36,7 +36,7 @@ Joueur
   │
   ├─► web (:3000)  Auth.js Google ──► cookie session (localhost)
   │         │
-  │         └─► play (:3001) /launch/[clientId]
+  │         └─► web /launch/[clientId]   (même domaine, cookie dispo)
   │                      │  POST /v1/launch (Bearer session)
   │                      ▼
   │                 redirect → jeu?token=…
@@ -53,16 +53,21 @@ Joueur
 ### Flux auth (implémenté)
 
 1. Login Google sur `web` → session DB Auth.js.
-2. Cookie `authjs.session-token` partagé sur `localhost` (tous ports).
-3. `play/launch/{clientId}` lit le cookie → `POST /v1/launch`.
+2. Cookie `authjs.session-token` sur `web` (et sur `localhost` tous ports en dev).
+3. `web/launch/{clientId}` lit le cookie → `POST /v1/launch`.
 4. Redirect vers `launchUrl` avec `?token=` + `?clientId=`.
 5. SDK `getUser()` → `GET /v1/session` → profil public.
 
 ### Flux « login depuis un jeu »
 
-1. Jeu → `play/launch/{clientId}` (recommandé) ou `web/login?returnTo=…&clientId=…`.
+1. Jeu → `web/launch/{clientId}` (recommandé) ou `web/login?returnTo=…&clientId=…`.
 2. Auth Google si besoin.
 3. Callback `redirect` Auth.js autorise `WEB_URL` et `PLAY_URL`.
+
+> Note prod : le launch vit sur `web` car il lit le cookie de session. En production
+> `*.vercel.app` est un **public suffix** (cookies isolés par sous-domaine) : `play`
+> ne peut pas lire la session de `web` (causait la boucle ERR_TOO_MANY_REDIRECTS).
+> `play/launch/{clientId}` ne fait que rediriger vers `web/launch/{clientId}`.
 
 ## Livrables par zone
 
@@ -71,8 +76,8 @@ Joueur
 | `@odfinex/shared` | ✅ | `User`, launch/session schemas, `ApiError` |
 | `@odfinex/db` | ✅ | Auth.js tables + `game_client` + `launch_token`, migrate/seed (`sandbox` + `duelpion`) |
 | `apps/api` | ✅ | `/v1/me`, `/launch`, `/session`, `/games`, middleware, allowlist, `CORS_ORIGINS` |
-| `apps/web` | ✅ | Google login, `/me`, catalogue → DUELPION, header |
-| `apps/play` | ✅ | `/launch/[clientId]`, sandbox `/sandbox` |
+| `apps/web` | ✅ | Google login, `/me`, catalogue → DUELPION, `/launch/[clientId]`, header |
+| `apps/play` | ✅ | redirect `/launch/[clientId]` → web, sandbox `/sandbox` |
 | `@odfinex/games-sdk` | ✅ | `getUser`, `getSession`, `loginUrl`, `OdfinexGamesError` |
 | Tests | ✅ | Vitest shared + api tokens + sdk (mocks) |
 | Docs intégrateur | ✅ | [`SDK-INTEGRATION.md`](./SDK-INTEGRATION.md) |
@@ -124,10 +129,11 @@ Légende : `[ ]` à faire · `[~]` en cours · `[x]` fait · `[-]` annulé / rep
 
 | # | Tâche | Statut | Notes |
 |---|---|---|---|
-| 4.1 | `/launch/[clientId]` | `[x]` | |
+| 4.1 | `/launch/[clientId]` | `[x]` | Initialement sur play |
 | 4.2 | API launch + redirect | `[x]` | |
 | 4.3 | Allowlist `redirectUrls` | `[x]` | |
 | 4.4 | Non connecté → login web | `[x]` | |
+| 4.5 | Launch déplacé sur `web` (anti-boucle prod) | `[x]` | `31/07` — cookies isolés sur `*.vercel.app` ; play redirige vers web |
 
 ---
 
@@ -233,7 +239,7 @@ pnpm --filter @odfinex/play dev
 ```
 
 1. http://localhost:3000 → Google → **DUELPION**
-2. Ou http://localhost:3001/launch/sandbox (test SDK)
+2. Ou http://localhost:3000/launch/sandbox (test SDK)
 
 ## Journal de progression
 
@@ -247,6 +253,7 @@ pnpm --filter @odfinex/play dev
 | 2026-07-27 | Docs | README / ARCHITECTURE / STACK / PHASE-1 alignés | guide SDK, E2E, commit |
 | 2026-07-28 | DUELPION | Premier consommateur réel + CORS + catalogue | — |
 | 2026-07-28 | Clôture | SDK-INTEGRATION, SECURITY, E2E, tag `phase-1` | Phase 2 wallet |
+| 2026-07-31 | Fix prod | Launch déplacé sur `web` (boucle `play`↔login sur `*.vercel.app`) ; docs à jour | — |
 
 ---
 

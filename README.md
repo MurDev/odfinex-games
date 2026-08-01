@@ -11,7 +11,7 @@ Un **sandbox** vit dans `apps/play` pour valider le flux launch / SDK (masqué d
 |---|---|---|
 | web | https://odfinex-web.vercel.app | Catalogue, login Google, profil |
 | admin | https://odfinex-admin.vercel.app | Ops (jeux, joueurs, transactions) |
-| play | https://odfinex-play.vercel.app | Launch session → jeu / sandbox |
+| play | https://odfinex-play.vercel.app | Surface sandbox (lit `?token=` depuis l'URL) |
 | API | https://odfinex-api-production.up.railway.app | Identity, launch tokens, game registry, wallet |
 
 Déploiement complet : [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) · Suivi : [`docs/ROADMAP.md`](docs/ROADMAP.md)
@@ -48,10 +48,10 @@ pnpm --filter @odfinex/play dev   # :3001
 
 | App | URL |
 |---|---|
-| web (catalogue) | http://localhost:3000 |
-| play | http://localhost:3001 |
-| play launch DUELPION | http://localhost:3001/launch/duelpion |
-| play launch sandbox | http://localhost:3001/launch/sandbox |
+| web (catalogue + launch) | http://localhost:3000 |
+| play (surface sandbox) | http://localhost:3001 |
+| launch DUELPION | http://localhost:3000/launch/duelpion |
+| launch sandbox | http://localhost:3000/launch/sandbox |
 | sandbox SDK | http://localhost:3001/sandbox |
 | api health | http://localhost:4000/health |
 | api games | http://localhost:4000/v1/games |
@@ -61,10 +61,10 @@ pnpm --filter @odfinex/play dev   # :3001
 
 1. Ouvre http://localhost:3000 → **Continuer avec Google**
 2. Sur le catalogue, clique **DUELPION** → launch → jeu sur `:3002` avec profil SDK
-3. Ou test SDK seul : http://localhost:3001/launch/sandbox
+3. Ou test SDK seul : http://localhost:3000/launch/sandbox
 4. Wallet : http://localhost:3000/wallet → **Crédit test** → sandbox Debit/Credit
 
-Sans session : `/launch/{clientId}` → redirect login web.
+Sans session : `/launch/{clientId}` → redirect login web (même domaine).
 
 ## Intégrer un jeu
 
@@ -76,8 +76,8 @@ Consommateur de référence hors monorepo : **DUELPION** (`../DUELPION`).
 
 ```text
 apps/
-  web/      # catalogue + Auth.js (Google)
-  play/     # /launch/[clientId] + sandbox SDK
+  web/      # catalogue + Auth.js (Google) + /launch/[clientId]
+  play/     # surface sandbox SDK (redirige /launch → web)
   api/      # Hono — identity + /v1/wallet*
   admin/    # ops (jeux, joueurs, transactions)
 packages/

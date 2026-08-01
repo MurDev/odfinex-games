@@ -47,15 +47,18 @@ Upsert via seed ([`packages/db/src/seed.ts`](../packages/db/src/seed.ts)) ou ins
 Puis `pnpm db:seed`.
 
 Le catalogue web (`apps/web`) liste les jeux actifs, sauf clients masqués (ex. `sandbox`).  
-Launch direct reste possible : `http://localhost:3001/launch/<clientId>`.
+Le launch se fait sur `web` (`/launch/{clientId}`) car il lit le cookie de session Auth.js.
+`play/launch/{clientId}` redirige vers `web/launch/{clientId}` (en prod `*.vercel.app`
+est un public suffix : les cookies ne traversent pas les sous-domaines, donc `play`
+ne peut pas lire la session de `web`).
 
 ## Flux d’entrée
 
 ### A — Depuis le catalogue
 
 ```text
-odfinexgames (/) → play/launch/{clientId}
-  → (si besoin) web/login Google
+odfinexgames (/) → /launch/{clientId} (même domaine web)
+  → (si besoin) web/login Google → retour sur /launch/{clientId}
   → POST /v1/launch
   → redirect → {launchUrl}?token=…&clientId=…
   → jeu : SDK getUser() / getSession()
@@ -63,9 +66,9 @@ odfinexgames (/) → play/launch/{clientId}
 
 ### B — Depuis le jeu (entrée directe)
 
-1. Bouton Connexion / Jouer → `http://localhost:3001/launch/{clientId}`  
-   (ou `client.loginUrl({ returnTo: playLaunchUrl })`).
-2. Play détecte la session Odfinex (cookie) ou redirige vers Google.
+1. Bouton Connexion / Jouer → `https://odfinex-web…/launch/{clientId}`  
+   (ou `client.loginUrl({ returnTo: launchUrl })`, où `launchUrl = webUrl/launch/{clientId}`).
+2. `web` détecte la session Odfinex (cookie) ou redirige vers Google (`/login`).
 3. Retour jeu avec `?token=`.
 4. Persister le token (ex. `localStorage`) et appeler `getSession()`.
 
@@ -73,7 +76,7 @@ Référence réelle : **DUELPION** (`../DUELPION`) — silent relaunch pour joue
 
 ### C — Sandbox local (test SDK)
 
-`http://localhost:3001/launch/sandbox` → `apps/play` `/sandbox`.
+`http://localhost:3000/launch/sandbox` → redirige vers `apps/play` `/sandbox?token=…`.
 
 ## Exemple minimal
 
@@ -103,9 +106,9 @@ try {
   throw err;
 }
 
-// Rediriger vers login plateforme (si tu n’utilises pas /launch directement)
+// Rediriger vers le launch plateforme (auth + token en une étape)
 const login = client.loginUrl({
-  returnTo: "http://localhost:3001/launch/duelpion",
+  returnTo: "http://localhost:3000/launch/duelpion",
 });
 ```
 
@@ -136,14 +139,14 @@ await client.credit({
 - Rejouer le même `referenceId` avec le même payload renvoie le même résultat (idempotent).
 - Crédit de test joueur : page web `/wallet` → « Crédit test » (`POST /v1/wallet/grant`, non-prod).
 
-Demo : `http://localhost:3001/launch/sandbox` (boutons Debit/Credit).
+Demo : `http://localhost:3000/launch/sandbox` (boutons Debit/Credit).
 
 ## Erreurs courantes
 
 | Code / symptôme | Cause | Action |
 |-----------------|-------|--------|
-| `MISSING_TOKEN` | Pas de `?token=` ni `sessionToken` | Passer par `/launch/{clientId}` |
-| `INVALID_TOKEN` | Token expiré / inconnu | Relancer via Play launch |
+| `MISSING_TOKEN` | Pas de `?token=` ni `sessionToken` | Passer par `/launch/{clientId}` (web) |
+| `INVALID_TOKEN` | Token expiré / inconnu | Relancer via `web/launch/{clientId}` |
 | Fetch `TypeError` / CORS | Origine jeu absente de CORS | Ajouter à `CORS_ORIGINS`, redémarrer API |
 | `GAME_NOT_FOUND` | `clientId` inconnu ou inactif | Seed / activer `game_client` |
 | `LAUNCH_URL_NOT_ALLOWED` | Origine `launchUrl` hors allowlist | Étendre `redirectUrls` |

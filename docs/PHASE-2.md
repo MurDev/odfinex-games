@@ -80,7 +80,7 @@ pnpm --filter @odfinex/web dev
 pnpm --filter @odfinex/play dev
 
 # 1. Login Google → http://localhost:3000/wallet → Crédit test
-# 2. http://localhost:3001/launch/sandbox → Debit / Credit
+# 2. http://localhost:3000/launch/sandbox → Debit / Credit
 ```
 
 ## Suite (Phase 2.1+)

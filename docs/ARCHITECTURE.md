@@ -21,16 +21,15 @@ Vercel                           Railway
 odfinexgames (web :3000)
   Auth.js Google → session DB (cookie authjs.session-token)
         │
-        │  catalogue → DUELPION (sandbox masqué)
+        │  catalogue → /launch/[clientId] (même domaine, cookie dispo)
         ▼
-play.odfinexgames (play :3001)
-  /launch/[clientId]
+web /launch/[clientId]
         │  lit cookie session → POST /v1/launch
         ▼
   redirect → jeu?token=…&clientId=…
         │
         ▼
-  jeu externe (ex. DUELPION) / sandbox
+  jeu externe (ex. DUELPION) / sandbox (play :3001)
         │  @odfinex/games-sdk.getUser()
         ▼
 Platform API (:4000)
@@ -46,6 +45,12 @@ Postgres (:55432)
   game_client, launch_token
   wallet_account, ledger_entry
 ```
+
+Le launch vit sur `web` car il lit le cookie de session Auth.js. `play` ne fait que la
+surface de démo (sandbox) : il consomme `?token=` depuis l'URL, jamais le cookie.
+En production `*.vercel.app` est un **public suffix** (cookies isolés par sous-domaine) :
+un launch porté par `play` ne pourrait jamais lire la session de `web` → c'est ce qui
+causait la boucle de redirection, corrigée en déplaçant le launch sur `web`.
 
 ## Principes
 
@@ -63,12 +68,16 @@ Postgres (:55432)
 | Étape | Qui | Quoi |
 |---|---|---|
 | 1 | `web` | Login Google → ligne `session` + cookie |
-| 2 | `play` | `/launch/{clientId}` avec cookie → `POST /v1/launch` |
+| 2 | `web` | `/launch/{clientId}` avec cookie → `POST /v1/launch` |
 | 3 | API | Crée `launch_token`, renvoie `launchUrl?token=` |
 | 4 | Jeu / sandbox | SDK `getUser()` → `GET /v1/session` |
 | 5 | API | Valide hash + expiry → profil public |
 
-Login alternatif depuis un jeu : `web/login?returnTo=…&clientId=…` (redirect Auth.js autorise `WEB_URL` et `PLAY_URL`), ou entrée directe `play/launch/{clientId}`.
+Entrée depuis un jeu : le jeu redirige vers `web/login?clientId=…&returnTo=/launch/{clientId}`
+(ou directement `web/launch/{clientId}`), le cookie de session reste sur `web`
+(même domaine) et le token voyage par l'URL (`?token=`). `play/launch/{clientId}`
+ne fait que rediriger vers `web/launch/{clientId}` (anti-boucle en prod,
+où les cookies ne traversent pas `*.vercel.app`).
 
 ## Packages
 
@@ -82,8 +91,8 @@ Login alternatif depuis un jeu : `web/login?returnTo=…&clientId=…` (redirect
 
 | App | Rôle |
 |---|---|
-| `web` | Catalogue, Google auth, `/me`, `/wallet` |
-| `play` | Launch + sandbox SDK (identité + money demo) |
+| `web` | Catalogue, Google auth, `/me`, `/wallet`, `/launch/[clientId]` |
+| `play` | Surface sandbox SDK (identité + money demo) |
 | `api` | Identity / registry / tokens / ledger |
 | `admin` | Ops (jeux, joueurs, transactions) |
 
