@@ -163,7 +163,10 @@ Chaque jeu expose **2 paires `clientId`/`client_secret`** : `{slug}.sandbox` et 
 - **Accès admin** : `UPDATE "user" SET is_admin = true WHERE email = '...'` (table `user`, colonne `is_admin`).
 - **Serveur DUELPION** : déployé via le `Dockerfile` du repo (`node:22-slim`, `npm ci`, `tsx`),
   `CMD` = migrations SQLite puis serveur ; `better-sqlite3` compilé depuis source (build tools dans le stage `deps`).
-- **DB prod** : accessible en psql via un TCP proxy public temporaire (`railway tcp-proxy create --port 5432 -s <postgres>`), à supprimer après usage.
+- **DB prod (web/admin)** : les apps Vercel (`odfinex-web`, `odfinex-admin`) lisent `DATABASE_URL` directement,
+  via l'URL **publique** du Postgres. Cette URL dépend du **TCP proxy du service Postgres** (`RAILWAY_TCP_PROXY_DOMAIN/PORT`).
+  → **Ne pas supprimer ce proxy** : c'est le `DATABASE_PUBLIC_URL` référencé par les apps. Pour un accès psql ponctuel,
+  créer un proxy temporaire séparé et le supprimer après usage.
 - **Cache turbo** : `turbo.json` → `remoteCache.enabled` + secrets GitHub `TURBO_TOKEN`/`TURBO_TEAM`.
 - Redéploiement Vercel sans commit : bouton *Redeploy* du dashboard, ou CLI depuis le dossier de l'app
   (`vercel --prod --force`). Attention au `rootDirectory` quand on lance depuis un sous-dossier.
