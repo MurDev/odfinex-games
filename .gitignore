@@ -12,3 +12,4 @@ coverage
 tsconfig.tsbuildinfo
 .vercel
 rootlink
+.env*

@@ -22,7 +22,7 @@
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
-    "@odfinex/shared": "^0.1.0"
+    "@odfinex/shared": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
