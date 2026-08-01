@@ -15,9 +15,10 @@ export default function HomePage() {
       <h1 style={{ fontSize: "2.5rem", lineHeight: 1.15, margin: "0.5rem 0 1rem" }}>
         Surface de jeu
       </h1>
-      <p style={{ opacity: 0.85, maxWidth: 42, fontSize: "1.05rem" }}>
-        Après le choix d&apos;un jeu sur le catalogue, le joueur arrive ici pour lancer la
-        session.
+      <p style={{ opacity: 0.85, maxWidth: 480, fontSize: "1.05rem" }}>
+        Surface de jeu de démo. Le lancement et la connexion se font via le
+        catalogue (<code>odfinex-web</code>) ; le jeu reçoit ensuite un token sécurisé
+        dans l&apos;URL.
       </p>
       <p style={{ marginTop: "2rem" }}>
         <Link href="/launch/sandbox.sandbox" style={{ color: "#60a5fa" }}>

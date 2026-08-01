@@ -1,6 +1,5 @@
 import { GamesListResponseSchema, type GameClient } from "@odfinex/shared";
 
-const playUrl = process.env.NEXT_PUBLIC_PLAY_URL ?? "http://localhost:3001";
 const apiUrl = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(
   /\/$/,
   "",
@@ -62,8 +61,8 @@ export default async function HomePage() {
         Catalogue
       </h1>
       <p style={{ opacity: 0.85, maxWidth: 480, fontSize: "1.05rem" }}>
-        Site principal — jeux, compte et wallet. Choisir un jeu redirige vers{" "}
-        <code>play.odfinexgames</code>.
+        Site principal — jeux, compte et wallet. Choisir un jeu lance la connexion
+        et redirige vers le jeu avec un token sécurisé.
       </p>
 
       <section
@@ -81,7 +80,7 @@ export default async function HomePage() {
           return (
             <a
               key={game.clientId}
-              href={`${playUrl}/launch/${encodeURIComponent(game.clientId)}`}
+              href={`/launch/${encodeURIComponent(game.clientId)}`}
               style={{
                 display: "flex",
                 alignItems: "center",

@@ -32,9 +32,8 @@ export default async function LoginPage({
       {params.error && (
         <p style={{ color: "#f87171", marginBottom: "1rem", fontSize: "0.9rem" }}>
           Connexion Google impossible
-          {params.error !== "1" ? ` (${params.error})` : ""}. Vérifie que Docker Postgres
-          tourne (<code>docker compose up -d</code>) et regarde les logs terminal (
-          <code>[auth:error]</code>).
+          {params.error !== "1" ? ` (${params.error})` : ""}. Vérifie la configuration
+          OAuth Google et l&apos;accès à la base de données, puis réessaie.
         </p>
       )}
 
