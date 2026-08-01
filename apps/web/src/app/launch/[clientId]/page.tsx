@@ -15,6 +15,7 @@ export default async function LaunchPage({ params }: PageProps) {
     const login = new URL("/login", process.env.AUTH_URL ?? "http://localhost:3000");
     login.searchParams.set("returnTo", `/launch/${encodeURIComponent(clientId)}`);
     login.searchParams.set("clientId", clientId);
+    login.searchParams.set("provider", "google");
     redirect(login.toString());
   }
 
@@ -25,6 +26,7 @@ export default async function LaunchPage({ params }: PageProps) {
       const login = new URL("/login", process.env.AUTH_URL ?? "http://localhost:3000");
       login.searchParams.set("returnTo", `/launch/${encodeURIComponent(clientId)}`);
       login.searchParams.set("clientId", clientId);
+      login.searchParams.set("provider", "google");
       redirect(login.toString());
     }
 

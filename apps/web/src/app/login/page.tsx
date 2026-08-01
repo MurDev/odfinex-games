@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string; clientId?: string; error?: string }>;
+  searchParams: Promise<{
+    returnTo?: string;
+    clientId?: string;
+    error?: string;
+    provider?: string;
+  }>;
 }) {
   const session = await auth();
   const params = await searchParams;
@@ -18,6 +23,15 @@ export default async function LoginPage({
   const googleConfigured = Boolean(
     process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
   );
+
+  // Direct Google OAuth (skip Odfinex login UI) when launched from a game
+  if (
+    params.provider === "google" &&
+    !params.error &&
+    googleConfigured
+  ) {
+    await signIn("google", { redirectTo: returnTo });
+  }
 
   return (
     <main style={{ maxWidth: 400, margin: "0 auto", padding: "6rem 1.5rem" }}>

@@ -17,6 +17,17 @@ describe("OdfinexGamesClient", () => {
     expect(url).toContain("returnTo=");
   });
 
+  it("builds loginUrl with provider=google", () => {
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion",
+      webUrl: "http://localhost:3000",
+    });
+    const url = client.loginUrl({ provider: "google" });
+    expect(url).toContain("clientId=duelpion");
+    expect(url).toContain("provider=google");
+  });
+
   it("getUser succeeds with valid token response", async () => {
     vi.stubGlobal(
       "fetch",

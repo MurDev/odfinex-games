@@ -88,10 +88,11 @@ export class OdfinexGamesClient {
   }
 
   /** Build Odfinex login URL (entrée depuis un jeu). */
-  loginUrl(options?: { returnTo?: string }): string {
+  loginUrl(options?: { returnTo?: string; provider?: "google" }): string {
     const url = new URL(`${this.webUrl}/login`);
     url.searchParams.set("clientId", this.clientId);
     if (options?.returnTo) url.searchParams.set("returnTo", options.returnTo);
+    if (options?.provider) url.searchParams.set("provider", options.provider);
     return url.toString();
   }
 
