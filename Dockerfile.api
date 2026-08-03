@@ -3,7 +3,9 @@ RUN corepack enable
 WORKDIR /app
 
 COPY . .
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile \
+  && pnpm --filter @odfinex/shared build \
+  && pnpm --filter @odfinex/games-sdk build
 
 EXPOSE 4000
 CMD ["sh", "-c", "pnpm --filter @odfinex/db db:migrate && pnpm --filter @odfinex/api start"]
