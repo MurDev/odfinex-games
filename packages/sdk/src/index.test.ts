@@ -290,4 +290,30 @@ describe("OdfinexGamesClient", () => {
     expect(res.status).toBe("successful");
     expect(res.balanceCents).toBe(5000);
   });
+
+  it("createWithdraw posts amount and phone with launch token", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://localhost:4000/v1/wallet/withdraw");
+      expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
+      expect(JSON.parse(String(init?.body))).toEqual({
+        amountHtg: 50,
+        phone: "37000000",
+      });
+      return Response.json({
+        id: "wd1",
+        status: "successful",
+        amountCents: 5000,
+        balanceCents: 1000,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+      sessionToken: "tok",
+    });
+    const res = await client.createWithdraw({ amountHtg: 50, phone: "37000000" });
+    expect(res.status).toBe("successful");
+    expect(res.balanceCents).toBe(1000);
+  });
 });

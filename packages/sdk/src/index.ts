@@ -9,6 +9,7 @@ import {
   WalletDepositResponseSchema,
   WalletMutationResponseSchema,
   WalletTransactionsResponseSchema,
+  WalletWithdrawResponseSchema,
   type ClientTransactionsResponse,
   type SessionResponse,
   type User,
@@ -355,6 +356,45 @@ export class OdfinexGamesClient {
     return WalletDepositCompleteResponseSchema.parse(await res.json());
   }
 
+  /**
+   * Withdraw HTG to a MonCash phone. Synchronous Bazik payout.
+   * Requires launch token. Debits wallet first; refunds on provider failure.
+   */
+  async createWithdraw(input: {
+    amountHtg: number;
+    phone: string;
+  }): Promise<{
+    id: string;
+    status: string;
+    amountCents: number;
+    balanceCents?: number;
+    providerTxId?: string | null;
+    dryRun?: boolean;
+    warning?: string;
+  }> {
+    const token = this.requireToken();
+    const body = JSON.stringify({
+      amountHtg: input.amountHtg,
+      phone: input.phone,
+    });
+
+    const res = await fetch(`${this.baseUrl}/v1/wallet/withdraw`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/wallet/withdraw failed (${res.status})`);
+    }
+
+    return WalletWithdrawResponseSchema.parse(await res.json());
+  }
+
   private async mutate(
     kind: "debit" | "credit",
     input: WalletMutationRequest,
@@ -403,6 +443,7 @@ export {
   WalletDepositCompleteResponseSchema,
   WalletTransactionsResponseSchema,
   ClientTransactionsResponseSchema,
+  WalletWithdrawResponseSchema,
   type HealthResponse,
   type User,
   type SessionResponse,
@@ -415,6 +456,8 @@ export {
   type WalletDepositCompleteResponse,
   type WalletTransactionsResponse,
   type ClientTransactionsResponse,
+  type WalletWithdrawRequest,
+  type WalletWithdrawResponse,
   type LedgerEntry,
   type ClientLedgerEntry,
 } from "@odfinex/shared";

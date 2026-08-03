@@ -574,10 +574,12 @@ deposit.post("/wallet/deposit/:orderId/complete", requireDepositAuth, async (c) 
 
 walletRoutes.route("/", deposit);
 
-const withdraw = new Hono<PlatformEnv>();
+const withdraw = new Hono<DepositEnv>();
 
-withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
+/** Withdraw — launch token (game) OR platform session (web). Synchrone Bazik. */
+withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
   const user = c.get("user");
+  const environment = c.get("environment");
   const body = await c.req.json().catch(() => null);
   const parsed = WalletWithdrawRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -596,7 +598,7 @@ withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
     return apiError(c, 400, "INVALID_PHONE", "MonCash phone must be 8 digits starting with 3 or 4");
   }
 
-  const balance = await getBalanceCents(user.id, "live");
+  const balance = await getBalanceCents(user.id, environment);
   if (balance < amountCents) {
     return apiError(c, 402, "INSUFFICIENT_FUNDS", "Insufficient wallet balance");
   }
@@ -606,7 +608,7 @@ withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
   const debit = await applyLedgerMutation({
     userId: user.id,
     clientId: "platform",
-    environment: "live",
+    environment,
     type: "debit",
     amountCents,
     reason: "moncash_withdraw",
@@ -626,7 +628,7 @@ withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
       phone,
       status: "processing",
       referenceId,
-      environment: "live",
+      environment,
     })
     .returning();
 
@@ -647,7 +649,7 @@ withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
       await applyLedgerMutation({
         userId: user.id,
         clientId: "platform",
-        environment: "live",
+        environment,
         type: "credit",
         amountCents,
         reason: "moncash_withdraw_refund",
@@ -665,10 +667,12 @@ withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
         .update(withdrawalRequests)
         .set({ status: "processing", providerTxId: payout.transactionId })
         .where(eq(withdrawalRequests.id, inserted!.id));
+      const balanceCents = await getBalanceCents(user.id, environment);
       return c.json({
         id: inserted!.id,
         status: "processing",
         amountCents,
+        balanceCents,
         providerTxId: payout.transactionId,
         warning: "Provider response ambiguous — verify before retrying",
       });
@@ -683,10 +687,12 @@ withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
       })
       .where(eq(withdrawalRequests.id, inserted!.id));
 
+    const balanceCents = await getBalanceCents(user.id, environment);
     return c.json({
       id: inserted!.id,
       status: "successful",
       amountCents,
+      balanceCents,
       providerTxId: payout.transactionId,
       dryRun: payout.dryRun ?? false,
     });
@@ -695,7 +701,7 @@ withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
     await applyLedgerMutation({
       userId: user.id,
       clientId: "platform",
-      environment: "live",
+      environment,
       type: "credit",
       amountCents,
       reason: "moncash_withdraw_refund",

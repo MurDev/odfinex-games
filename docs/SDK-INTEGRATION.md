@@ -175,7 +175,7 @@ Demo : `http://localhost:3000/launch/sandbox` (boutons Debit/Credit).
 | `POST` | `/v1/wallet/credit-user` | HMAC S2S seul (`X-Client-Id` + secret) — pas de launch token |
 | `POST` | `/v1/wallet/deposit` | Launch **ou** session — crée paiement MonCash (body: amountHtg, successUrl, errorUrl) |
 | `POST` | `/v1/wallet/deposit/:orderId/complete` | Launch **ou** session — confirme après retour MonCash |
-| `POST` | `/v1/wallet/withdraw` | Session — débit + payout MonCash |
+| `POST` | `/v1/wallet/withdraw` | Launch **ou** session — débit + payout MonCash (body: amountHtg, phone) |
 | `GET` | `/v1/wallet/transactions` | Launch **ou** session |
 | `GET` | `/v1/client/transactions` | HMAC S2S seul — ledger filtré pour ce `clientId` (+ dépôts platform liés) |
 | `POST` | `/v1/wallet/grant` | Session, non-prod live |

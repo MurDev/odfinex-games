@@ -152,7 +152,10 @@ export const WalletWithdrawResponseSchema = z.object({
   id: z.string(),
   status: z.string(),
   amountCents: z.number().int().positive(),
+  balanceCents: z.number().int().nonnegative().optional(),
   providerTxId: z.string().nullable().optional(),
+  dryRun: z.boolean().optional(),
+  warning: z.string().optional(),
 });
 
 export type WalletWithdrawResponse = z.infer<typeof WalletWithdrawResponseSchema>;
