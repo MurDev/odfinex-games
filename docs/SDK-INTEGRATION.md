@@ -170,11 +170,25 @@ Demo : `http://localhost:3000/launch/sandbox` (boutons Debit/Credit).
 | `POST` | `/v1/wallet/debit` | Launch + HMAC S2S (`clientSecret`) |
 | `POST` | `/v1/wallet/credit` | Launch + HMAC S2S (`clientSecret`) |
 | `POST` | `/v1/wallet/credit-user` | HMAC S2S seul (`X-Client-Id` + secret) — pas de launch token |
-| `POST` | `/v1/wallet/deposit` | Session — crée un paiement MonCash (Bazik) |
+| `POST` | `/v1/wallet/deposit` | Launch **ou** session — crée paiement MonCash (body: amountHtg, successUrl, errorUrl) |
+| `POST` | `/v1/wallet/deposit/:orderId/complete` | Launch **ou** session — confirme après retour MonCash |
 | `POST` | `/v1/wallet/withdraw` | Session — débit + payout MonCash |
 | `GET` | `/v1/wallet/transactions` | Session |
 | `POST` | `/v1/wallet/grant` | Session, non-prod live |
 | `POST` | `/webhooks/bazik` | Signature Bazik |
+
+SDK dépôt (jeu) :
+
+```ts
+const { redirectUrl, orderId } = await client.createDeposit({
+  amountHtg: 100,
+  successUrl: "https://mygame.com/wallet/deposit/complete",
+  errorUrl: "https://mygame.com/wallet?deposit=error",
+});
+window.location.href = redirectUrl;
+// après retour :
+await client.completeDeposit(orderId);
+```
 
 ## Hors scope (plus tard)
 

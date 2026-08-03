@@ -40,6 +40,11 @@ import {
   type S2SClientVariables,
 } from "../middleware/s2s-client.js";
 import {
+  isAllowedRedirectUrl,
+  requireDepositAuth,
+  type DepositAuthVariables,
+} from "../middleware/deposit-auth.js";
+import {
   createPayment,
   classifyWithdrawOutcome,
   isBazikMock,
@@ -51,6 +56,7 @@ import { fulfillDeposit } from "../payments/fulfill-deposit.js";
 type LaunchEnv = { Variables: LaunchAuthVariables };
 type PlatformEnv = { Variables: AuthVariables };
 type S2SEnv = { Variables: S2SClientVariables };
+type DepositEnv = { Variables: DepositAuthVariables };
 
 const MIN_HTG = 10;
 const MAX_HTG = 75_000;
@@ -360,8 +366,15 @@ player.post("/wallet/grant", requirePlatformSession, async (c) => {
   });
 });
 
-player.post("/wallet/deposit", requirePlatformSession, async (c) => {
+walletRoutes.route("/", player);
+
+/** Deposits — launch token (games SDK) OR platform session (odfinex-web) */
+const deposit = new Hono<DepositEnv>();
+
+deposit.post("/wallet/deposit", requireDepositAuth, async (c) => {
   const user = c.get("user");
+  const environment = c.get("environment");
+  const allowedOrigins = c.get("allowedOrigins");
   const body = await c.req.json().catch(() => null);
   const parsed = WalletDepositRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -369,14 +382,30 @@ player.post("/wallet/deposit", requirePlatformSession, async (c) => {
       c,
       400,
       "INVALID_BODY",
-      `Invalid deposit (amount ${MIN_HTG}–${MAX_HTG} HTG)`,
+      `Invalid deposit (amount ${MIN_HTG}–${MAX_HTG} HTG, method moncash)`,
     );
+  }
+
+  if (parsed.data.method !== "moncash") {
+    return apiError(c, 400, "METHOD_NOT_SUPPORTED", "Only moncash deposits are supported");
+  }
+
+  const webUrl = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const defaultSuccess = `${webUrl}/wallet/deposit/complete`;
+  const defaultError = `${webUrl}/wallet?deposit=error`;
+  const successUrl = parsed.data.successUrl ?? defaultSuccess;
+  const errorUrl = parsed.data.errorUrl ?? defaultError;
+
+  if (!isAllowedRedirectUrl(successUrl, allowedOrigins)) {
+    return apiError(c, 400, "INVALID_SUCCESS_URL", "successUrl origin is not allowlisted for this client");
+  }
+  if (!isAllowedRedirectUrl(errorUrl, allowedOrigins)) {
+    return apiError(c, 400, "INVALID_ERROR_URL", "errorUrl origin is not allowlisted for this client");
   }
 
   const amountHtg = parsed.data.amountHtg;
   const amountCents = amountHtg * 100;
   const referenceId = `dep_${user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const webUrl = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
   const apiPublic =
     process.env.API_URL ??
     process.env.PUBLIC_API_URL ??
@@ -392,8 +421,8 @@ player.post("/wallet/deposit", requirePlatformSession, async (c) => {
       gdes: amountHtg,
       description: "Odfinex Games deposit",
       referenceId,
-      successUrl: `${webUrl}/wallet/deposit/complete`,
-      errorUrl: `${webUrl}/wallet?deposit=error`,
+      successUrl,
+      errorUrl,
       webhookUrl: `${apiUrl}/webhooks/bazik`,
       metadata: { userId: user.id },
     });
@@ -414,7 +443,7 @@ player.post("/wallet/deposit", requirePlatformSession, async (c) => {
     status: "pending",
     referenceId,
     redirectUrl: payment.redirectUrl,
-    environment: "live",
+    environment,
   });
 
   return c.json({
@@ -426,8 +455,9 @@ player.post("/wallet/deposit", requirePlatformSession, async (c) => {
   });
 });
 
-player.post("/wallet/deposit/:orderId/complete", requirePlatformSession, async (c) => {
+deposit.post("/wallet/deposit/:orderId/complete", requireDepositAuth, async (c) => {
   const user = c.get("user");
+  const environment = c.get("environment");
   const orderId = c.req.param("orderId");
 
   const order = await db
@@ -449,7 +479,7 @@ player.post("/wallet/deposit/:orderId/complete", requirePlatformSession, async (
     return c.json({ status: "pending", providerStatus: result.status });
   }
 
-  const balanceCents = await getBalanceCents(user.id, "live");
+  const balanceCents = await getBalanceCents(user.id, environment);
   return c.json({
     status: "successful",
     balanceCents,
@@ -457,7 +487,11 @@ player.post("/wallet/deposit/:orderId/complete", requirePlatformSession, async (
   });
 });
 
-player.post("/wallet/withdraw", requirePlatformSession, async (c) => {
+walletRoutes.route("/", deposit);
+
+const withdraw = new Hono<PlatformEnv>();
+
+withdraw.post("/wallet/withdraw", requirePlatformSession, async (c) => {
   const user = c.get("user");
   const body = await c.req.json().catch(() => null);
   const parsed = WalletWithdrawRequestSchema.safeParse(body);
@@ -595,4 +629,4 @@ player.post("/wallet/withdraw", requirePlatformSession, async (c) => {
   }
 });
 
-walletRoutes.route("/", player);
+walletRoutes.route("/", withdraw);

@@ -109,6 +109,9 @@ export type WalletCreditUserRequest = z.infer<typeof WalletCreditUserRequestSche
 
 export const WalletDepositRequestSchema = z.object({
   amountHtg: z.number().int().min(10).max(75_000),
+  method: z.enum(["moncash"]).optional().default("moncash"),
+  successUrl: z.string().url().optional(),
+  errorUrl: z.string().url().optional(),
 });
 
 export type WalletDepositRequest = z.infer<typeof WalletDepositRequestSchema>;
@@ -118,9 +121,21 @@ export const WalletDepositResponseSchema = z.object({
   amountCents: z.number().int().positive(),
   redirectUrl: z.string().url(),
   status: z.string(),
+  mock: z.boolean().optional(),
 });
 
 export type WalletDepositResponse = z.infer<typeof WalletDepositResponseSchema>;
+
+export const WalletDepositCompleteResponseSchema = z.object({
+  status: z.enum(["successful", "pending"]),
+  balanceCents: z.number().int().nonnegative().optional(),
+  outcome: z.string().optional(),
+  providerStatus: z.string().optional(),
+});
+
+export type WalletDepositCompleteResponse = z.infer<
+  typeof WalletDepositCompleteResponseSchema
+>;
 
 export const WalletWithdrawRequestSchema = z.object({
   amountHtg: z.number().int().min(10).max(75_000),

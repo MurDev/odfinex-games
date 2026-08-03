@@ -30,12 +30,16 @@ const duelpionGame = {
   slug: "duelpion",
   name: "DUELPION",
   hidden: false,
-  launchUrl: "http://localhost:3002",
+  launchUrl: "http://localhost:3005",
   redirectUrls: [
+    "http://localhost:3005",
+    "http://localhost:3005/",
     "http://localhost:3002",
     "http://localhost:3002/",
+    "http://127.0.0.1:3005",
     "http://127.0.0.1:3002",
-    "http://127.0.0.1:3002/",
+    "https://duelpion-web.vercel.app",
+    "https://duelpion-web.vercel.app/",
   ],
   walletEnabled: true,
 };

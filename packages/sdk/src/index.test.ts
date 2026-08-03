@@ -183,4 +183,53 @@ describe("OdfinexGamesClient", () => {
       }),
     ).rejects.toMatchObject({ code: "MISSING_CLIENT_SECRET" });
   });
+
+  it("createDeposit posts with launch token and returns redirectUrl", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://localhost:4000/v1/wallet/deposit");
+      const headers = init?.headers as Record<string, string>;
+      expect(headers.Authorization).toBe("Bearer tok");
+      const body = JSON.parse(String(init?.body));
+      expect(body.amountHtg).toBe(100);
+      expect(body.method).toBe("moncash");
+      return Response.json({
+        orderId: "ord_1",
+        amountCents: 10000,
+        redirectUrl: "https://moncash.example/pay",
+        status: "pending",
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+      sessionToken: "tok",
+    });
+    const res = await client.createDeposit({
+      amountHtg: 100,
+      successUrl: "https://duelpion.example/ok",
+      errorUrl: "https://duelpion.example/err",
+    });
+    expect(res.redirectUrl).toBe("https://moncash.example/pay");
+    expect(res.orderId).toBe("ord_1");
+  });
+
+  it("completeDeposit calls order complete endpoint", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        expect(url).toContain("/v1/wallet/deposit/ord_1/complete");
+        return Response.json({ status: "successful", balanceCents: 5000 });
+      }),
+    );
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion",
+      sessionToken: "tok",
+    });
+    const res = await client.completeDeposit("ord_1");
+    expect(res.status).toBe("successful");
+    expect(res.balanceCents).toBe(5000);
+  });
 });

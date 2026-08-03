@@ -4,6 +4,8 @@
 import {
   SessionResponseSchema,
   WalletBalanceSchema,
+  WalletDepositCompleteResponseSchema,
+  WalletDepositResponseSchema,
   WalletMutationResponseSchema,
   type SessionResponse,
   type User,
@@ -205,6 +207,73 @@ export class OdfinexGamesClient {
     return WalletMutationResponseSchema.parse(await res.json());
   }
 
+  /**
+   * Start a MonCash deposit. Returns Bazik `redirectUrl` — send the player there directly.
+   * Requires launch token. Does not need clientSecret.
+   */
+  async createDeposit(input: {
+    amountHtg: number;
+    successUrl: string;
+    errorUrl: string;
+    method?: "moncash";
+  }): Promise<{
+    orderId: string;
+    amountCents: number;
+    redirectUrl: string;
+    status: string;
+    mock?: boolean;
+  }> {
+    const token = this.requireToken();
+    const body = JSON.stringify({
+      amountHtg: input.amountHtg,
+      successUrl: input.successUrl,
+      errorUrl: input.errorUrl,
+      method: input.method ?? "moncash",
+    });
+
+    const res = await fetch(`${this.baseUrl}/v1/wallet/deposit`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/wallet/deposit failed (${res.status})`);
+    }
+
+    return WalletDepositResponseSchema.parse(await res.json());
+  }
+
+  /** Confirm a deposit after return from MonCash (or mock). */
+  async completeDeposit(orderId: string): Promise<{
+    status: "successful" | "pending";
+    balanceCents?: number;
+    outcome?: string;
+    providerStatus?: string;
+  }> {
+    const token = this.requireToken();
+    const res = await fetch(
+      `${this.baseUrl}/v1/wallet/deposit/${encodeURIComponent(orderId)}/complete`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/wallet/deposit/.../complete failed (${res.status})`);
+    }
+
+    return WalletDepositCompleteResponseSchema.parse(await res.json());
+  }
+
   private async mutate(
     kind: "debit" | "credit",
     input: WalletMutationRequest,
@@ -248,6 +317,9 @@ export {
   WalletMutationRequestSchema,
   WalletMutationResponseSchema,
   WalletCreditUserRequestSchema,
+  WalletDepositRequestSchema,
+  WalletDepositResponseSchema,
+  WalletDepositCompleteResponseSchema,
   type HealthResponse,
   type User,
   type SessionResponse,
@@ -255,4 +327,7 @@ export {
   type WalletMutationRequest,
   type WalletMutationResponse,
   type WalletCreditUserRequest,
+  type WalletDepositRequest,
+  type WalletDepositResponse,
+  type WalletDepositCompleteResponse,
 } from "@odfinex/shared";
