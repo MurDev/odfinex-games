@@ -297,13 +297,16 @@ describe("OdfinexGamesClient", () => {
       expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
       expect(JSON.parse(String(init?.body))).toEqual({
         amountHtg: 50,
+        method: "moncash",
+        account: "37000000",
         phone: "37000000",
       });
       return Response.json({
         id: "wd1",
-        status: "successful",
+        status: "pending",
         amountCents: 5000,
         balanceCents: 1000,
+        method: "moncash",
       });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -313,7 +316,7 @@ describe("OdfinexGamesClient", () => {
       sessionToken: "tok",
     });
     const res = await client.createWithdraw({ amountHtg: 50, phone: "37000000" });
-    expect(res.status).toBe("successful");
+    expect(res.status).toBe("pending");
     expect(res.balanceCents).toBe(1000);
   });
 });
