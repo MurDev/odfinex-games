@@ -13,6 +13,8 @@ export type DepositAuthVariables = {
   environment: WalletEnvironment;
   /** Origins allowed for successUrl / errorUrl redirects */
   allowedOrigins: string[];
+  /** Game clientId when auth is via launch token; null for platform session */
+  clientId: string | null;
 };
 
 function originOf(url: string): string | null {
@@ -46,6 +48,7 @@ export const requireDepositAuth = createMiddleware<{
         environment: gameClients.environment,
         launchUrl: gameClients.launchUrl,
         redirectUrls: gameClients.redirectUrls,
+        clientId: launchTokens.clientId,
       })
       .from(launchTokens)
       .innerJoin(users, eq(launchTokens.userId, users.id))
@@ -72,6 +75,7 @@ export const requireDepositAuth = createMiddleware<{
       c.set("user", toPublicUser(launchRow.user));
       c.set("environment", launchRow.environment);
       c.set("allowedOrigins", [...origins]);
+      c.set("clientId", launchRow.clientId);
       await next();
       return;
     }
@@ -88,6 +92,7 @@ export const requireDepositAuth = createMiddleware<{
       c.set("user", toPublicUser(sess.user));
       c.set("environment", "live");
       c.set("allowedOrigins", webFallbackOrigins());
+      c.set("clientId", null);
       await next();
       return;
     }
@@ -123,6 +128,7 @@ export const requireDepositAuth = createMiddleware<{
         c.set("user", toPublicUser(sess.user));
         c.set("environment", "live");
         c.set("allowedOrigins", webFallbackOrigins());
+        c.set("clientId", null);
         await next();
         return;
       }

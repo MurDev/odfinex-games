@@ -139,11 +139,17 @@ export type WalletDepositCompleteResponse = z.infer<
 
 export const WalletWithdrawRequestSchema = z.object({
   amountHtg: z.number().int().min(10).max(75_000),
+  method: z.enum(["moncash", "natcash"]).optional().default("moncash"),
+  /** MonCash phone (8 digits) or NatCash account number */
+  account: z.string().min(3).max(64).optional(),
+  accountName: z.string().min(1).max(128).optional(),
+  /** @deprecated use account — kept for MonCash callers */
   phone: z
     .string()
     .min(8)
     .max(20)
-    .regex(/^[0-9+\-\s]+$/, "Invalid phone"),
+    .regex(/^[0-9+\-\s]+$/, "Invalid phone")
+    .optional(),
 });
 
 export type WalletWithdrawRequest = z.infer<typeof WalletWithdrawRequestSchema>;
@@ -152,6 +158,7 @@ export const WalletWithdrawResponseSchema = z.object({
   id: z.string(),
   status: z.string(),
   amountCents: z.number().int().positive(),
+  method: z.enum(["moncash", "natcash"]).optional(),
   balanceCents: z.number().int().nonnegative().optional(),
   providerTxId: z.string().nullable().optional(),
   dryRun: z.boolean().optional(),
@@ -159,6 +166,40 @@ export const WalletWithdrawResponseSchema = z.object({
 });
 
 export type WalletWithdrawResponse = z.infer<typeof WalletWithdrawResponseSchema>;
+
+export const ManualDepositRequestCreateSchema = z.object({
+  amountHtg: z.number().int().min(10).max(75_000),
+  method: z.enum(["natcash"]).optional().default("natcash"),
+  reference: z.string().min(3).max(128).optional(),
+  paymentProofUrl: z.string().url().optional(),
+});
+
+export type ManualDepositRequestCreate = z.infer<typeof ManualDepositRequestCreateSchema>;
+
+export const ManualDepositRequestSchema = z.object({
+  id: z.string(),
+  amountCents: z.number().int().positive(),
+  status: z.enum(["pending", "approved", "rejected", "cancelled"]),
+  paymentProofUrl: z.string().nullable().optional(),
+  reference: z.string().nullable().optional(),
+  adminComment: z.string().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string().optional(),
+});
+
+export type ManualDepositRequest = z.infer<typeof ManualDepositRequestSchema>;
+
+export const PaymentRailPublicSchema = z.object({
+  method: z.literal("natcash"),
+  enabled: z.boolean(),
+  accountName: z.string(),
+  accountNumber: z.string(),
+  minAmountCents: z.number().int(),
+  maxAmountCents: z.number().int(),
+  instructions: z.string().nullable().optional(),
+});
+
+export type PaymentRailPublic = z.infer<typeof PaymentRailPublicSchema>;
 
 export const WalletGrantRequestSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_00),
@@ -246,6 +287,7 @@ export const AdminGameUpdateSchema = z.object({
   redirectUrls: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
   walletEnabled: z.boolean().optional(),
+  notifyUrl: z.string().url().nullable().optional(),
 });
 
 export type AdminGameUpdate = z.infer<typeof AdminGameUpdateSchema>;

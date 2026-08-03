@@ -5,12 +5,15 @@ import {
   gameClients,
   launchTokens,
   ledgerEntries,
+  manualDepositRequests,
+  paymentRailConfigs,
   sessions,
   users,
   withdrawalRequests,
 } from "@odfinex/db";
 import type { WalletEnvironment } from "@odfinex/shared";
 import {
+  ManualDepositRequestCreateSchema,
   WalletCreditUserRequestSchema,
   WalletDepositRequestSchema,
   WalletGrantRequestSchema,
@@ -46,10 +49,7 @@ import {
 } from "../middleware/deposit-auth.js";
 import {
   createPayment,
-  classifyWithdrawOutcome,
   isBazikMock,
-  splitFullName,
-  withdrawToMoncash,
 } from "../payments/bazik.js";
 import { fulfillDeposit } from "../payments/fulfill-deposit.js";
 
@@ -358,6 +358,155 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
   });
 });
 
+/** S2S read-only: manual NatCash deposit requests for this game's players */
+s2s.get("/client/deposit-requests", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 100);
+  const offset = Number(c.req.query("offset") ?? 0) || 0;
+  const status = c.req.query("status");
+
+  let whereClause = and(
+    sql`(
+      ${manualDepositRequests.clientId} = ${clientId}
+      OR ${manualDepositRequests.userId} IN (
+        SELECT user_id FROM ledger_entry WHERE client_id = ${clientId}
+        UNION
+        SELECT user_id FROM launch_token WHERE client_id = ${clientId}
+        UNION
+        SELECT user_id FROM manual_deposit_request WHERE client_id = ${clientId}
+      )
+    )`,
+  );
+  if (status) {
+    whereClause = and(whereClause, eq(manualDepositRequests.status, status));
+  }
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(manualDepositRequests)
+    .where(whereClause);
+
+  const items = await db
+    .select({
+      id: manualDepositRequests.id,
+      userId: manualDepositRequests.userId,
+      amountCents: manualDepositRequests.amountCents,
+      status: manualDepositRequests.status,
+      paymentProofUrl: manualDepositRequests.paymentProofUrl,
+      reference: manualDepositRequests.reference,
+      adminComment: manualDepositRequests.adminComment,
+      clientId: manualDepositRequests.clientId,
+      environment: manualDepositRequests.environment,
+      createdAt: manualDepositRequests.createdAt,
+      updatedAt: manualDepositRequests.updatedAt,
+      displayName: users.name,
+      email: users.email,
+    })
+    .from(manualDepositRequests)
+    .leftJoin(users, eq(manualDepositRequests.userId, users.id))
+    .where(whereClause)
+    .orderBy(desc(manualDepositRequests.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json({
+    items: items.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      displayName: r.displayName,
+      email: r.email,
+      amountCents: r.amountCents,
+      status: r.status,
+      paymentProofUrl: r.paymentProofUrl,
+      reference: r.reference,
+      adminComment: r.adminComment,
+      clientId: r.clientId,
+      environment: r.environment,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+    total: totalRow?.count ?? 0,
+    limit,
+    offset,
+  });
+});
+
+/** S2S read-only: withdrawal requests for this game's players */
+s2s.get("/client/withdrawal-requests", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 100);
+  const offset = Number(c.req.query("offset") ?? 0) || 0;
+  const status = c.req.query("status");
+
+  let whereClause = and(
+    sql`(
+      ${withdrawalRequests.clientId} = ${clientId}
+      OR ${withdrawalRequests.userId} IN (
+        SELECT user_id FROM ledger_entry WHERE client_id = ${clientId}
+        UNION
+        SELECT user_id FROM launch_token WHERE client_id = ${clientId}
+        UNION
+        SELECT user_id FROM withdrawal_request WHERE client_id = ${clientId}
+      )
+    )`,
+  );
+  if (status) {
+    whereClause = and(whereClause, eq(withdrawalRequests.status, status));
+  }
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(withdrawalRequests)
+    .where(whereClause);
+
+  const items = await db
+    .select({
+      id: withdrawalRequests.id,
+      userId: withdrawalRequests.userId,
+      amountCents: withdrawalRequests.amountCents,
+      method: withdrawalRequests.method,
+      account: withdrawalRequests.account,
+      accountName: withdrawalRequests.accountName,
+      phone: withdrawalRequests.phone,
+      status: withdrawalRequests.status,
+      adminComment: withdrawalRequests.adminComment,
+      clientId: withdrawalRequests.clientId,
+      environment: withdrawalRequests.environment,
+      createdAt: withdrawalRequests.createdAt,
+      completedAt: withdrawalRequests.completedAt,
+      displayName: users.name,
+      email: users.email,
+    })
+    .from(withdrawalRequests)
+    .leftJoin(users, eq(withdrawalRequests.userId, users.id))
+    .where(whereClause)
+    .orderBy(desc(withdrawalRequests.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json({
+    items: items.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      displayName: r.displayName,
+      email: r.email,
+      amountCents: r.amountCents,
+      method: r.method,
+      account: r.account || r.phone,
+      accountName: r.accountName,
+      status: r.status,
+      adminComment: r.adminComment,
+      clientId: r.clientId,
+      environment: r.environment,
+      createdAt: r.createdAt.toISOString(),
+      completedAt: r.completedAt?.toISOString() ?? null,
+    })),
+    total: totalRow?.count ?? 0,
+    limit,
+    offset,
+  });
+});
+
 walletRoutes.route("/", s2s);
 
 const player = new Hono<PlatformEnv>();
@@ -576,10 +725,14 @@ walletRoutes.route("/", deposit);
 
 const withdraw = new Hono<DepositEnv>();
 
-/** Withdraw — launch token (game) OR platform session (web). Synchrone Bazik. */
+/**
+ * Create a withdrawal request (hold funds). Odfinex admin approves later.
+ * MonCash + NatCash.
+ */
 withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
   const user = c.get("user");
   const environment = c.get("environment");
+  const clientId = c.get("clientId");
   const body = await c.req.json().catch(() => null);
   const parsed = WalletWithdrawRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -587,16 +740,37 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
       c,
       400,
       "INVALID_BODY",
-      `Invalid withdraw (amount ${MIN_HTG}–${MAX_HTG} HTG, phone required)`,
+      `Invalid withdraw (amount ${MIN_HTG}–${MAX_HTG} HTG, method + account required)`,
     );
+  }
+
+  const method = parsed.data.method ?? "moncash";
+  const rawAccount = (parsed.data.account ?? parsed.data.phone ?? "").trim();
+  if (!rawAccount) {
+    return apiError(c, 400, "INVALID_ACCOUNT", "account (or phone) is required");
+  }
+
+  let account = rawAccount;
+  let accountName = parsed.data.accountName?.trim() || null;
+
+  if (method === "moncash") {
+    account = normalizePhone(account);
+    if (!/^3\d{7}$/.test(account) && !/^4\d{7}$/.test(account)) {
+      return apiError(c, 400, "INVALID_PHONE", "MonCash phone must be 8 digits starting with 3 or 4");
+    }
+  } else if (method === "natcash") {
+    if (!accountName) {
+      return apiError(c, 400, "INVALID_ACCOUNT_NAME", "accountName is required for NatCash withdrawals");
+    }
+    if (account.length < 3) {
+      return apiError(c, 400, "INVALID_ACCOUNT", "NatCash account number is too short");
+    }
+  } else {
+    return apiError(c, 400, "METHOD_NOT_SUPPORTED", "Unsupported withdraw method");
   }
 
   const amountHtg = parsed.data.amountHtg;
   const amountCents = amountHtg * 100;
-  const phone = normalizePhone(parsed.data.phone);
-  if (!/^3\d{7}$/.test(phone) && !/^4\d{7}$/.test(phone)) {
-    return apiError(c, 400, "INVALID_PHONE", "MonCash phone must be 8 digits starting with 3 or 4");
-  }
 
   const balance = await getBalanceCents(user.id, environment);
   if (balance < amountCents) {
@@ -611,7 +785,7 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
     environment,
     type: "debit",
     amountCents,
-    reason: "moncash_withdraw",
+    reason: `${method}_withdraw_hold`,
     referenceId,
   });
 
@@ -625,99 +799,246 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
     .values({
       userId: user.id,
       amountCents,
-      phone,
-      status: "processing",
+      phone: method === "moncash" ? account : "",
+      method,
+      account,
+      accountName,
+      clientId,
+      status: "pending",
       referenceId,
       environment,
     })
     .returning();
 
-  const names = splitFullName(user.displayName ?? user.email ?? "Player");
+  const balanceCents = await getBalanceCents(user.id, environment);
+  return c.json({
+    id: inserted!.id,
+    status: "pending",
+    amountCents,
+    method,
+    balanceCents,
+  });
+});
 
-  try {
-    const payout = await withdrawToMoncash({
-      gdes: amountHtg,
-      wallet: phone,
-      ...names,
-      referenceId,
-      description: "Odfinex Games withdrawal",
-      customerEmail: user.email ?? undefined,
-    });
+withdraw.get("/wallet/withdraw-requests", requireDepositAuth, async (c) => {
+  const user = c.get("user");
+  const environment = c.get("environment");
+  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
 
-    const outcome = classifyWithdrawOutcome(payout.status, payout.transactionId);
-    if (outcome === "failed") {
-      await applyLedgerMutation({
-        userId: user.id,
-        clientId: "platform",
-        environment,
-        type: "credit",
-        amountCents,
-        reason: "moncash_withdraw_refund",
-        referenceId: `refund_${referenceId}`,
-      });
-      await db
-        .update(withdrawalRequests)
-        .set({ status: "failed", completedAt: new Date(), providerTxId: payout.transactionId })
-        .where(eq(withdrawalRequests.id, inserted!.id));
-      return apiError(c, 502, "WITHDRAW_FAILED", "MonCash payout failed; balance refunded");
-    }
+  const items = await db
+    .select()
+    .from(withdrawalRequests)
+    .where(
+      and(
+        eq(withdrawalRequests.userId, user.id),
+        eq(withdrawalRequests.environment, environment),
+      ),
+    )
+    .orderBy(desc(withdrawalRequests.createdAt))
+    .limit(limit);
 
-    if (outcome === "ambiguous") {
-      await db
-        .update(withdrawalRequests)
-        .set({ status: "processing", providerTxId: payout.transactionId })
-        .where(eq(withdrawalRequests.id, inserted!.id));
-      const balanceCents = await getBalanceCents(user.id, environment);
-      return c.json({
-        id: inserted!.id,
-        status: "processing",
-        amountCents,
-        balanceCents,
-        providerTxId: payout.transactionId,
-        warning: "Provider response ambiguous — verify before retrying",
-      });
-    }
+  return c.json({
+    items: items.map((r) => ({
+      id: r.id,
+      amountCents: r.amountCents,
+      method: r.method,
+      account: r.account || r.phone,
+      accountName: r.accountName,
+      status: r.status,
+      adminComment: r.adminComment,
+      createdAt: r.createdAt.toISOString(),
+      completedAt: r.completedAt?.toISOString() ?? null,
+    })),
+  });
+});
 
-    await db
-      .update(withdrawalRequests)
-      .set({
-        status: "successful",
-        completedAt: new Date(),
-        providerTxId: payout.transactionId,
-      })
-      .where(eq(withdrawalRequests.id, inserted!.id));
+withdraw.post("/wallet/withdraw-requests/:id/cancel", requireDepositAuth, async (c) => {
+  const user = c.get("user");
+  const environment = c.get("environment");
+  const id = c.req.param("id");
 
-    const balanceCents = await getBalanceCents(user.id, environment);
-    return c.json({
-      id: inserted!.id,
-      status: "successful",
-      amountCents,
-      balanceCents,
-      providerTxId: payout.transactionId,
-      dryRun: payout.dryRun ?? false,
-    });
-  } catch (err) {
-    console.error("[withdraw] provider error", err);
-    await applyLedgerMutation({
-      userId: user.id,
-      clientId: "platform",
-      environment,
-      type: "credit",
-      amountCents,
-      reason: "moncash_withdraw_refund",
-      referenceId: `refund_${referenceId}`,
-    });
-    await db
-      .update(withdrawalRequests)
-      .set({ status: "failed", completedAt: new Date() })
-      .where(eq(withdrawalRequests.id, inserted!.id));
+  const row = await db
+    .select()
+    .from(withdrawalRequests)
+    .where(eq(withdrawalRequests.id, id))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!row || row.userId !== user.id) {
+    return apiError(c, 404, "NOT_FOUND", "Withdrawal request not found");
+  }
+  if (row.status !== "pending") {
+    return apiError(c, 409, "NOT_PENDING", "Only pending withdrawals can be cancelled");
+  }
+
+  await applyLedgerMutation({
+    userId: user.id,
+    clientId: "platform",
+    environment,
+    type: "credit",
+    amountCents: row.amountCents,
+    reason: `${row.method}_withdraw_cancel_refund`,
+    referenceId: `cancel_${row.referenceId}`,
+  });
+
+  await db
+    .update(withdrawalRequests)
+    .set({ status: "cancelled", completedAt: new Date() })
+    .where(eq(withdrawalRequests.id, id));
+
+  const balanceCents = await getBalanceCents(user.id, environment);
+  return c.json({ id, status: "cancelled", balanceCents });
+});
+
+/** Public NatCash coords for deposit UI */
+withdraw.get("/wallet/payment-rails", requireDepositAuth, async (c) => {
+  const environment = c.get("environment");
+  const rails = await db
+    .select()
+    .from(paymentRailConfigs)
+    .where(eq(paymentRailConfigs.environment, environment));
+
+  return c.json({
+    items: rails
+      .filter((r) => r.enabled && r.method === "natcash")
+      .map((r) => ({
+        method: "natcash" as const,
+        enabled: r.enabled,
+        accountName: r.accountName,
+        accountNumber: r.accountNumber,
+        minAmountCents: r.minAmountCents,
+        maxAmountCents: r.maxAmountCents,
+        instructions: r.instructions,
+      })),
+  });
+});
+
+withdraw.post("/wallet/deposit-requests", requireDepositAuth, async (c) => {
+  const user = c.get("user");
+  const environment = c.get("environment");
+  const clientId = c.get("clientId");
+  const body = await c.req.json().catch(() => null);
+  const parsed = ManualDepositRequestCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "Invalid deposit request");
+  }
+
+  const reference = parsed.data.reference?.trim() || null;
+  const paymentProofUrl = parsed.data.paymentProofUrl?.trim() || null;
+  if (!reference && !paymentProofUrl) {
     return apiError(
       c,
-      502,
-      "PAYMENT_PROVIDER_ERROR",
-      err instanceof Error ? err.message : "Withdraw failed",
+      400,
+      "PROOF_OR_REFERENCE_REQUIRED",
+      "Provide a payment reference (≥3 chars) or a proof URL",
     );
   }
+
+  const rail = await db
+    .select()
+    .from(paymentRailConfigs)
+    .where(
+      and(
+        eq(paymentRailConfigs.method, "natcash"),
+        eq(paymentRailConfigs.environment, environment),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!rail?.enabled) {
+    return apiError(c, 400, "METHOD_DISABLED", "NatCash deposits are not enabled");
+  }
+  if (!rail.accountName.trim() || !rail.accountNumber.trim()) {
+    return apiError(c, 503, "RAIL_MISCONFIGURED", "NatCash destination is not configured");
+  }
+
+  const amountCents = parsed.data.amountHtg * 100;
+  if (amountCents < rail.minAmountCents || amountCents > rail.maxAmountCents) {
+    return apiError(
+      c,
+      400,
+      "AMOUNT_OUT_OF_RANGE",
+      `Amount must be between ${rail.minAmountCents / 100} and ${rail.maxAmountCents / 100} HTG`,
+    );
+  }
+
+  const [inserted] = await db
+    .insert(manualDepositRequests)
+    .values({
+      userId: user.id,
+      clientId,
+      amountCents,
+      status: "pending",
+      paymentProofUrl,
+      reference,
+      environment,
+    })
+    .returning();
+
+  return c.json({
+    id: inserted!.id,
+    amountCents,
+    status: "pending",
+    createdAt: inserted!.createdAt.toISOString(),
+  });
+});
+
+withdraw.get("/wallet/deposit-requests", requireDepositAuth, async (c) => {
+  const user = c.get("user");
+  const environment = c.get("environment");
+  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
+
+  const items = await db
+    .select()
+    .from(manualDepositRequests)
+    .where(
+      and(
+        eq(manualDepositRequests.userId, user.id),
+        eq(manualDepositRequests.environment, environment),
+      ),
+    )
+    .orderBy(desc(manualDepositRequests.createdAt))
+    .limit(limit);
+
+  return c.json({
+    items: items.map((r) => ({
+      id: r.id,
+      amountCents: r.amountCents,
+      status: r.status,
+      paymentProofUrl: r.paymentProofUrl,
+      reference: r.reference,
+      adminComment: r.adminComment,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+  });
+});
+
+withdraw.post("/wallet/deposit-requests/:id/cancel", requireDepositAuth, async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+
+  const row = await db
+    .select()
+    .from(manualDepositRequests)
+    .where(eq(manualDepositRequests.id, id))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!row || row.userId !== user.id) {
+    return apiError(c, 404, "NOT_FOUND", "Deposit request not found");
+  }
+  if (row.status !== "pending") {
+    return apiError(c, 409, "NOT_PENDING", "Only pending requests can be cancelled");
+  }
+
+  await db
+    .update(manualDepositRequests)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(manualDepositRequests.id, id));
+
+  return c.json({ id, status: "cancelled" });
 });
 
 walletRoutes.route("/", withdraw);

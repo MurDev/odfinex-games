@@ -1,0 +1,221 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Save } from "lucide-react";
+
+type Rail = {
+  id: string;
+  method: string;
+  enabled: boolean;
+  accountName: string;
+  accountNumber: string;
+  minAmountCents: number;
+  maxAmountCents: number;
+  instructions: string | null;
+  environment: string;
+};
+
+export default function PaymentRailsPage() {
+  const [rails, setRails] = useState<Rail[]>([]);
+  const [env, setEnv] = useState<"live" | "sandbox">("live");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/proxy/admin/payment-rails?environment=${env}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message ?? "Erreur");
+      setRails(data.items ?? []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [env]);
+
+  async function save(rail: Rail) {
+    setSaving(rail.id);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(`/api/proxy/admin/payment-rails/${rail.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          enabled: rail.enabled,
+          accountName: rail.accountName,
+          accountNumber: rail.accountNumber,
+          minAmountCents: rail.minAmountCents,
+          maxAmountCents: rail.maxAmountCents,
+          instructions: rail.instructions,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message ?? "Erreur");
+      setSuccess("Configuration enregistree");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Payment rails</h1>
+          <p className="text-sm text-muted-foreground">
+            Coordonnees NatCash pour les depots manuels
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={env === "live" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setEnv("live")}
+          >
+            Live
+          </Button>
+          <Button
+            variant={env === "sandbox" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setEnv("sandbox")}
+          >
+            Sandbox
+          </Button>
+        </div>
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {success && <p className="text-sm text-emerald-400">{success}</p>}
+
+      {loading ? (
+        <p className="text-muted-foreground">Chargement…</p>
+      ) : rails.length === 0 ? (
+        <p className="text-muted-foreground">Aucune config (lancez la migration 0006).</p>
+      ) : (
+        rails.map((rail) => (
+          <Card key={rail.id}>
+            <CardHeader>
+              <CardTitle className="text-base capitalize">{rail.method}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Active</p>
+                  <p className="text-xs text-muted-foreground">Visible aux joueurs pour depot</p>
+                </div>
+                <Switch
+                  checked={rail.enabled}
+                  onCheckedChange={(v) =>
+                    setRails((all) =>
+                      all.map((r) => (r.id === rail.id ? { ...r, enabled: v } : r)),
+                    )
+                  }
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nom du compte</Label>
+                  <Input
+                    value={rail.accountName}
+                    onChange={(e) =>
+                      setRails((all) =>
+                        all.map((r) =>
+                          r.id === rail.id ? { ...r, accountName: e.target.value } : r,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Numero de compte</Label>
+                  <Input
+                    value={rail.accountNumber}
+                    onChange={(e) =>
+                      setRails((all) =>
+                        all.map((r) =>
+                          r.id === rail.id ? { ...r, accountNumber: e.target.value } : r,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Min (HTG)</Label>
+                  <Input
+                    type="number"
+                    value={rail.minAmountCents / 100}
+                    onChange={(e) =>
+                      setRails((all) =>
+                        all.map((r) =>
+                          r.id === rail.id
+                            ? { ...r, minAmountCents: Math.round(Number(e.target.value) * 100) }
+                            : r,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max (HTG)</Label>
+                  <Input
+                    type="number"
+                    value={rail.maxAmountCents / 100}
+                    onChange={(e) =>
+                      setRails((all) =>
+                        all.map((r) =>
+                          r.id === rail.id
+                            ? { ...r, maxAmountCents: Math.round(Number(e.target.value) * 100) }
+                            : r,
+                        ),
+                      )
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Instructions</Label>
+                <Input
+                  value={rail.instructions ?? ""}
+                  onChange={(e) =>
+                    setRails((all) =>
+                      all.map((r) =>
+                        r.id === rail.id ? { ...r, instructions: e.target.value } : r,
+                      ),
+                    )
+                  }
+                />
+              </div>
+              <Button onClick={() => void save(rail)} disabled={saving === rail.id}>
+                {saving === rail.id ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Enregistrer
+              </Button>
+            </CardContent>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+}

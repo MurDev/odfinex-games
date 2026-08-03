@@ -87,6 +87,8 @@ export const gameClients = pgTable("game_client", {
   isActive: boolean("is_active").notNull().default(true),
   walletEnabled: boolean("wallet_enabled").notNull().default(false),
   clientSecretHash: text("client_secret_hash"),
+  /** Optional HMAC webhook for wallet deposit/withdraw status events */
+  notifyUrl: text("notify_url"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
@@ -165,7 +167,10 @@ export const depositOrders = pgTable(
   },
 );
 
-/** MonCash withdrawal requests */
+/**
+ * Withdrawal requests (MonCash + NatCash).
+ * Funds are debited on create (hold); Odfinex admin approves/rejects.
+ */
 export const withdrawalRequests = pgTable(
   "withdrawal_request",
   {
@@ -176,8 +181,16 @@ export const withdrawalRequests = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     amountCents: integer("amount_cents").notNull(),
-    phone: text("phone").notNull(),
-    status: text("status").notNull().default("pending"), // pending | processing | successful | failed
+    /** @deprecated use account; kept for legacy MonCash rows */
+    phone: text("phone").notNull().default(""),
+    method: text("method").notNull().default("moncash"), // moncash | natcash
+    account: text("account").notNull().default(""),
+    accountName: text("account_name"),
+    clientId: text("client_id"),
+    adminComment: text("admin_comment"),
+    reviewedBy: text("reviewed_by"),
+    reviewedAt: timestamp("reviewed_at", { mode: "date" }),
+    status: text("status").notNull().default("pending"), // pending | processing | successful | failed | cancelled
     referenceId: text("reference_id").notNull().unique(),
     providerTxId: text("provider_tx_id"),
     environment: environmentEnum("environment").notNull().default("live"),
@@ -185,6 +198,50 @@ export const withdrawalRequests = pgTable(
     completedAt: timestamp("completed_at", { mode: "date" }),
   },
 );
+
+/** NatCash (and future rails) destination config — admin Odfinex only */
+export const paymentRailConfigs = pgTable(
+  "payment_rail_config",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    method: text("method").notNull(), // natcash
+    enabled: boolean("enabled").notNull().default(false),
+    accountName: text("account_name").notNull().default(""),
+    accountNumber: text("account_number").notNull().default(""),
+    minAmountCents: integer("min_amount_cents").notNull().default(1000),
+    maxAmountCents: integer("max_amount_cents").notNull().default(7_500_000),
+    instructions: text("instructions"),
+    environment: environmentEnum("environment").notNull().default("live"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("payment_rail_config_method_env_unique").on(table.method, table.environment),
+  ],
+);
+
+/** Manual NatCash deposit requests — Odfinex admin approves */
+export const manualDepositRequests = pgTable("manual_deposit_request", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  clientId: text("client_id"),
+  amountCents: integer("amount_cents").notNull(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected | cancelled
+  paymentProofUrl: text("payment_proof_url"),
+  reference: text("reference"),
+  adminComment: text("admin_comment"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { mode: "date" }),
+  environment: environmentEnum("environment").notNull().default("live"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
 
 /** Processed Bazik webhook event ids (idempotency) */
 export const webhookEvents = pgTable("webhook_event", {

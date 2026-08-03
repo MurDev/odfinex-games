@@ -357,25 +357,34 @@ export class OdfinexGamesClient {
   }
 
   /**
-   * Withdraw HTG to a MonCash phone. Synchronous Bazik payout.
-   * Requires launch token. Debits wallet first; refunds on provider failure.
+   * Withdraw HTG (MonCash or NatCash). Creates a pending request (hold).
+   * Odfinex admin must approve. Requires launch token.
    */
   async createWithdraw(input: {
     amountHtg: number;
-    phone: string;
+    method?: "moncash" | "natcash";
+    account?: string;
+    accountName?: string;
+    /** @deprecated use account */
+    phone?: string;
   }): Promise<{
     id: string;
     status: string;
     amountCents: number;
+    method?: string;
     balanceCents?: number;
     providerTxId?: string | null;
     dryRun?: boolean;
     warning?: string;
   }> {
     const token = this.requireToken();
+    const method = input.method ?? "moncash";
     const body = JSON.stringify({
       amountHtg: input.amountHtg,
-      phone: input.phone,
+      method,
+      account: input.account ?? input.phone,
+      accountName: input.accountName,
+      phone: input.phone ?? (method === "moncash" ? input.account : undefined),
     });
 
     const res = await fetch(`${this.baseUrl}/v1/wallet/withdraw`, {
@@ -393,6 +402,241 @@ export class OdfinexGamesClient {
     }
 
     return WalletWithdrawResponseSchema.parse(await res.json());
+  }
+
+  async getPaymentRails(): Promise<{
+    items: Array<{
+      method: "natcash";
+      enabled: boolean;
+      accountName: string;
+      accountNumber: string;
+      minAmountCents: number;
+      maxAmountCents: number;
+      instructions?: string | null;
+    }>;
+  }> {
+    const token = this.requireToken();
+    const res = await fetch(`${this.baseUrl}/v1/wallet/payment-rails`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) {
+      return this.parseError(res, `GET /v1/wallet/payment-rails failed (${res.status})`);
+    }
+    return (await res.json()) as {
+      items: Array<{
+        method: "natcash";
+        enabled: boolean;
+        accountName: string;
+        accountNumber: string;
+        minAmountCents: number;
+        maxAmountCents: number;
+        instructions?: string | null;
+      }>;
+    };
+  }
+
+  async createDepositRequest(input: {
+    amountHtg: number;
+    reference?: string;
+    paymentProofUrl?: string;
+    method?: "natcash";
+  }): Promise<{ id: string; amountCents: number; status: string; createdAt: string }> {
+    const token = this.requireToken();
+    const body = JSON.stringify({
+      amountHtg: input.amountHtg,
+      method: input.method ?? "natcash",
+      reference: input.reference,
+      paymentProofUrl: input.paymentProofUrl,
+    });
+    const res = await fetch(`${this.baseUrl}/v1/wallet/deposit-requests`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/wallet/deposit-requests failed (${res.status})`);
+    }
+    return (await res.json()) as {
+      id: string;
+      amountCents: number;
+      status: string;
+      createdAt: string;
+    };
+  }
+
+  async listDepositRequests(limit = 20): Promise<{
+    items: Array<{
+      id: string;
+      amountCents: number;
+      status: string;
+      paymentProofUrl?: string | null;
+      reference?: string | null;
+      adminComment?: string | null;
+      createdAt: string;
+    }>;
+  }> {
+    const token = this.requireToken();
+    const res = await fetch(
+      `${this.baseUrl}/v1/wallet/deposit-requests?limit=${limit}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+    if (!res.ok) {
+      return this.parseError(res, `GET /v1/wallet/deposit-requests failed (${res.status})`);
+    }
+    return (await res.json()) as {
+      items: Array<{
+        id: string;
+        amountCents: number;
+        status: string;
+        paymentProofUrl?: string | null;
+        reference?: string | null;
+        adminComment?: string | null;
+        createdAt: string;
+      }>;
+    };
+  }
+
+  async cancelDepositRequest(id: string): Promise<{ id: string; status: string }> {
+    const token = this.requireToken();
+    const res = await fetch(
+      `${this.baseUrl}/v1/wallet/deposit-requests/${encodeURIComponent(id)}/cancel`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+    if (!res.ok) {
+      return this.parseError(res, `POST cancel deposit-request failed (${res.status})`);
+    }
+    return (await res.json()) as { id: string; status: string };
+  }
+
+  async listWithdrawRequests(limit = 20): Promise<{
+    items: Array<{
+      id: string;
+      amountCents: number;
+      method: string;
+      account: string;
+      status: string;
+      createdAt: string;
+    }>;
+  }> {
+    const token = this.requireToken();
+    const res = await fetch(
+      `${this.baseUrl}/v1/wallet/withdraw-requests?limit=${limit}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+    if (!res.ok) {
+      return this.parseError(res, `GET /v1/wallet/withdraw-requests failed (${res.status})`);
+    }
+    return (await res.json()) as {
+      items: Array<{
+        id: string;
+        amountCents: number;
+        method: string;
+        account: string;
+        status: string;
+        createdAt: string;
+      }>;
+    };
+  }
+
+  async cancelWithdrawRequest(id: string): Promise<{
+    id: string;
+    status: string;
+    balanceCents?: number;
+  }> {
+    const token = this.requireToken();
+    const res = await fetch(
+      `${this.baseUrl}/v1/wallet/withdraw-requests/${encodeURIComponent(id)}/cancel`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+    if (!res.ok) {
+      return this.parseError(res, `POST cancel withdraw-request failed (${res.status})`);
+    }
+    return (await res.json()) as {
+      id: string;
+      status: string;
+      balanceCents?: number;
+    };
+  }
+
+  /** S2S: list deposit requests for this client (read-only). */
+  async listClientDepositRequests(opts?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+  }): Promise<{ items: unknown[]; total: number }> {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.offset) params.set("offset", String(opts.offset));
+    if (opts?.status) params.set("status", opts.status);
+    const qs = params.toString();
+    return this.s2sGet(`/v1/client/deposit-requests${qs ? `?${qs}` : ""}`);
+  }
+
+  /** S2S: list withdrawal requests for this client (read-only). */
+  async listClientWithdrawalRequests(opts?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+  }): Promise<{ items: unknown[]; total: number }> {
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.offset) params.set("offset", String(opts.offset));
+    if (opts?.status) params.set("status", opts.status);
+    const qs = params.toString();
+    return this.s2sGet(`/v1/client/withdrawal-requests${qs ? `?${qs}` : ""}`);
+  }
+
+  private async s2sGet(path: string): Promise<{ items: unknown[]; total: number }> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(401, "MISSING_SECRET", "clientSecret required for S2S");
+    }
+    const timestamp = Date.now().toString();
+    const body = "";
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "x-client-id": this.clientId,
+        "x-client-secret": this.clientSecret,
+        "x-timestamp": timestamp,
+        "x-client-signature": signature,
+      },
+    });
+    if (!res.ok) {
+      return this.parseError(res, `GET ${path} failed (${res.status})`);
+    }
+    return (await res.json()) as { items: unknown[]; total: number };
   }
 
   private async mutate(

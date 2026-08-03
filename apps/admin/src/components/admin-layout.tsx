@@ -12,6 +12,9 @@ import {
   X,
   ChevronLeft,
   LogOut,
+  Landmark,
+  Inbox,
+  Banknote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,6 +40,9 @@ const navItems: NavItem[] = [
   { label: "Jeux", href: "/games", icon: Gamepad2 },
   { label: "Joueurs", href: "/players", icon: Users },
   { label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
+  { label: "Payment rails", href: "/payment-rails", icon: Landmark },
+  { label: "Depots NatCash", href: "/deposit-requests", icon: Inbox },
+  { label: "Retraits", href: "/withdrawal-requests", icon: Banknote },
 ];
 
 type AdminLayoutProps = {
