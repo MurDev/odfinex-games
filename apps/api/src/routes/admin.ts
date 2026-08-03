@@ -4,9 +4,12 @@ import { randomBytes } from "node:crypto";
 import {
   gameClients,
   ledgerEntries,
+  manualDepositRequests,
+  paymentRailConfigs,
   sessions,
   users,
   walletAccounts,
+  withdrawalRequests,
 } from "@odfinex/db";
 
 import { db } from "../db.js";
@@ -15,6 +18,13 @@ import { toPublicUser } from "../lib/user.js";
 import type { User, WalletEnvironment } from "@odfinex/shared";
 import { requirePlatformSession, type AuthVariables } from "../middleware/auth.js";
 import { generateClientSecret } from "../lib/signature.js";
+import { applyLedgerMutation } from "../lib/wallet.js";
+import { notifyGameWalletEvent } from "../lib/notify-game.js";
+import {
+  classifyWithdrawOutcome,
+  splitFullName,
+  withdrawToMoncash,
+} from "../payments/bazik.js";
 
 type Env = { Variables: AuthVariables };
 
@@ -138,6 +148,7 @@ adminRoutes.get("/admin/games/:clientId", requirePlatformSession, requireAdmin, 
     redirectUrls: game.redirectUrls,
     isActive: game.isActive,
     walletEnabled: game.walletEnabled,
+    notifyUrl: game.notifyUrl,
     hasClientSecret: !!game.clientSecretHash,
     createdAt: game.createdAt.toISOString(),
     playerCount: playerCount?.count ?? 0,
@@ -154,7 +165,7 @@ adminRoutes.patch("/admin/games/:clientId", requirePlatformSession, requireAdmin
     return apiError(c, 400, "INVALID_BODY", "Invalid request body");
   }
 
-  const allowed = ["name", "launchUrl", "redirectUrls", "isActive", "walletEnabled", "hidden"];
+  const allowed = ["name", "launchUrl", "redirectUrls", "isActive", "walletEnabled", "hidden", "notifyUrl"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = (body as Record<string, unknown>)[key];
@@ -442,3 +453,516 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
     total: totalRow?.count ?? 0,
   });
 });
+
+/* ── Payment rails (NatCash config) ── */
+
+adminRoutes.get("/admin/payment-rails", requirePlatformSession, requireAdmin, async (c) => {
+  const environment = (c.req.query("environment") === "sandbox" ? "sandbox" : "live") as WalletEnvironment;
+  const rows = await db
+    .select()
+    .from(paymentRailConfigs)
+    .where(eq(paymentRailConfigs.environment, environment));
+
+  return c.json({
+    items: rows.map((r) => ({
+      id: r.id,
+      method: r.method,
+      enabled: r.enabled,
+      accountName: r.accountName,
+      accountNumber: r.accountNumber,
+      minAmountCents: r.minAmountCents,
+      maxAmountCents: r.maxAmountCents,
+      instructions: r.instructions,
+      environment: r.environment,
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+  });
+});
+
+adminRoutes.patch("/admin/payment-rails/:id", requirePlatformSession, requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({}));
+  const existing = await db
+    .select()
+    .from(paymentRailConfigs)
+    .where(eq(paymentRailConfigs.id, id))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  if (!existing) return apiError(c, 404, "NOT_FOUND", "Payment rail not found");
+
+  const enabled =
+    typeof body.enabled === "boolean" ? body.enabled : existing.enabled;
+  const accountName =
+    typeof body.accountName === "string" ? body.accountName.trim() : existing.accountName;
+  const accountNumber =
+    typeof body.accountNumber === "string"
+      ? body.accountNumber.trim()
+      : existing.accountNumber;
+  const minAmountCents =
+    typeof body.minAmountCents === "number"
+      ? body.minAmountCents
+      : typeof body.minAmountHtg === "number"
+        ? Math.round(body.minAmountHtg * 100)
+        : existing.minAmountCents;
+  const maxAmountCents =
+    typeof body.maxAmountCents === "number"
+      ? body.maxAmountCents
+      : typeof body.maxAmountHtg === "number"
+        ? Math.round(body.maxAmountHtg * 100)
+        : existing.maxAmountCents;
+  const instructions =
+    typeof body.instructions === "string" ? body.instructions : existing.instructions;
+
+  if (enabled && (!accountName || !accountNumber)) {
+    return apiError(
+      c,
+      400,
+      "INVALID_CONFIG",
+      "Cannot enable NatCash without account name and number",
+    );
+  }
+
+  const [updated] = await db
+    .update(paymentRailConfigs)
+    .set({
+      enabled,
+      accountName,
+      accountNumber,
+      minAmountCents,
+      maxAmountCents,
+      instructions,
+      updatedAt: new Date(),
+    })
+    .where(eq(paymentRailConfigs.id, id))
+    .returning();
+
+  return c.json({ item: updated });
+});
+
+/* ── Manual deposit requests ── */
+
+adminRoutes.get("/admin/deposit-requests", requirePlatformSession, requireAdmin, async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 100);
+  const offset = Number(c.req.query("offset") ?? 0) || 0;
+  const status = c.req.query("status");
+
+  let whereClause = undefined;
+  if (status) whereClause = eq(manualDepositRequests.status, status);
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(manualDepositRequests)
+    .where(whereClause);
+
+  const items = await db
+    .select({
+      id: manualDepositRequests.id,
+      userId: manualDepositRequests.userId,
+      amountCents: manualDepositRequests.amountCents,
+      status: manualDepositRequests.status,
+      paymentProofUrl: manualDepositRequests.paymentProofUrl,
+      reference: manualDepositRequests.reference,
+      adminComment: manualDepositRequests.adminComment,
+      clientId: manualDepositRequests.clientId,
+      environment: manualDepositRequests.environment,
+      createdAt: manualDepositRequests.createdAt,
+      updatedAt: manualDepositRequests.updatedAt,
+      displayName: users.name,
+      email: users.email,
+    })
+    .from(manualDepositRequests)
+    .leftJoin(users, eq(manualDepositRequests.userId, users.id))
+    .where(whereClause)
+    .orderBy(desc(manualDepositRequests.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json({
+    items: items.map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    })),
+    total: totalRow?.count ?? 0,
+  });
+});
+
+adminRoutes.post(
+  "/admin/deposit-requests/:id/approve",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const admin = c.get("user");
+    const id = c.req.param("id");
+    const row = await db
+      .select()
+      .from(manualDepositRequests)
+      .where(eq(manualDepositRequests.id, id))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!row) return apiError(c, 404, "NOT_FOUND", "Deposit request not found");
+    if (row.status !== "pending") {
+      return apiError(c, 409, "NOT_PENDING", "Request is not pending");
+    }
+
+    const credit = await applyLedgerMutation({
+      userId: row.userId,
+      clientId: "platform",
+      environment: row.environment as WalletEnvironment,
+      type: "credit",
+      amountCents: row.amountCents,
+      reason: "natcash_deposit",
+      referenceId: `mdep_${row.id}`,
+    });
+    if (!credit.ok) {
+      return apiError(c, 409, credit.code, credit.message);
+    }
+
+    await db
+      .update(manualDepositRequests)
+      .set({
+        status: "approved",
+        reviewedBy: admin.id,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(manualDepositRequests.id, id));
+
+    await notifyGameWalletEvent(row.clientId, {
+      type: "deposit_request",
+      requestId: row.id,
+      userId: row.userId,
+      status: "approved",
+      amountCents: row.amountCents,
+      method: "natcash",
+    });
+
+    return c.json({ id, status: "approved", balanceCents: credit.balanceCents });
+  },
+);
+
+adminRoutes.post(
+  "/admin/deposit-requests/:id/reject",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const admin = c.get("user");
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const comment =
+      typeof body.comment === "string" ? body.comment.trim() : "";
+
+    const row = await db
+      .select()
+      .from(manualDepositRequests)
+      .where(eq(manualDepositRequests.id, id))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!row) return apiError(c, 404, "NOT_FOUND", "Deposit request not found");
+    if (row.status !== "pending") {
+      return apiError(c, 409, "NOT_PENDING", "Request is not pending");
+    }
+
+    await db
+      .update(manualDepositRequests)
+      .set({
+        status: "rejected",
+        adminComment: comment || null,
+        reviewedBy: admin.id,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(manualDepositRequests.id, id));
+
+    await notifyGameWalletEvent(row.clientId, {
+      type: "deposit_request",
+      requestId: row.id,
+      userId: row.userId,
+      status: "rejected",
+      amountCents: row.amountCents,
+      method: "natcash",
+    });
+
+    return c.json({ id, status: "rejected" });
+  },
+);
+
+/* ── Withdrawal requests ── */
+
+adminRoutes.get("/admin/withdrawal-requests", requirePlatformSession, requireAdmin, async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 100);
+  const offset = Number(c.req.query("offset") ?? 0) || 0;
+  const status = c.req.query("status");
+
+  let whereClause = undefined;
+  if (status) whereClause = eq(withdrawalRequests.status, status);
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(withdrawalRequests)
+    .where(whereClause);
+
+  const items = await db
+    .select({
+      id: withdrawalRequests.id,
+      userId: withdrawalRequests.userId,
+      amountCents: withdrawalRequests.amountCents,
+      method: withdrawalRequests.method,
+      account: withdrawalRequests.account,
+      accountName: withdrawalRequests.accountName,
+      phone: withdrawalRequests.phone,
+      status: withdrawalRequests.status,
+      adminComment: withdrawalRequests.adminComment,
+      clientId: withdrawalRequests.clientId,
+      environment: withdrawalRequests.environment,
+      createdAt: withdrawalRequests.createdAt,
+      completedAt: withdrawalRequests.completedAt,
+      displayName: users.name,
+      email: users.email,
+    })
+    .from(withdrawalRequests)
+    .leftJoin(users, eq(withdrawalRequests.userId, users.id))
+    .where(whereClause)
+    .orderBy(desc(withdrawalRequests.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json({
+    items: items.map((r) => ({
+      ...r,
+      account: r.account || r.phone,
+      createdAt: r.createdAt.toISOString(),
+      completedAt: r.completedAt?.toISOString() ?? null,
+    })),
+    total: totalRow?.count ?? 0,
+  });
+});
+
+adminRoutes.post(
+  "/admin/withdrawal-requests/:id/approve",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const admin = c.get("user");
+    const id = c.req.param("id");
+    const row = await db
+      .select()
+      .from(withdrawalRequests)
+      .where(eq(withdrawalRequests.id, id))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!row) return apiError(c, 404, "NOT_FOUND", "Withdrawal request not found");
+    if (row.status !== "pending") {
+      return apiError(c, 409, "NOT_PENDING", "Request is not pending");
+    }
+
+    const account = row.account || row.phone;
+    const method = row.method || "moncash";
+
+    if (method === "natcash") {
+      await db
+        .update(withdrawalRequests)
+        .set({
+          status: "successful",
+          reviewedBy: admin.id,
+          reviewedAt: new Date(),
+          completedAt: new Date(),
+        })
+        .where(eq(withdrawalRequests.id, id));
+
+      await notifyGameWalletEvent(row.clientId, {
+        type: "withdrawal_request",
+        requestId: row.id,
+        userId: row.userId,
+        status: "successful",
+        amountCents: row.amountCents,
+        method,
+      });
+
+      return c.json({ id, status: "successful", manual: true });
+    }
+
+    // MonCash via Bazik
+    await db
+      .update(withdrawalRequests)
+      .set({ status: "processing", reviewedBy: admin.id, reviewedAt: new Date() })
+      .where(eq(withdrawalRequests.id, id));
+
+    const userRow = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, row.userId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    const names = splitFullName(userRow?.name ?? userRow?.email ?? "Player");
+
+    try {
+      const payout = await withdrawToMoncash({
+        gdes: row.amountCents / 100,
+        wallet: account,
+        ...names,
+        referenceId: row.referenceId,
+        description: "Odfinex Games withdrawal",
+        customerEmail: userRow?.email ?? undefined,
+      });
+
+      const outcome = classifyWithdrawOutcome(payout.status, payout.transactionId);
+      if (outcome === "failed") {
+        await applyLedgerMutation({
+          userId: row.userId,
+          clientId: "platform",
+          environment: row.environment as WalletEnvironment,
+          type: "credit",
+          amountCents: row.amountCents,
+          reason: "moncash_withdraw_refund",
+          referenceId: `refund_${row.referenceId}`,
+        });
+        await db
+          .update(withdrawalRequests)
+          .set({
+            status: "failed",
+            completedAt: new Date(),
+            providerTxId: payout.transactionId,
+            adminComment: "Provider payout failed",
+          })
+          .where(eq(withdrawalRequests.id, id));
+
+        await notifyGameWalletEvent(row.clientId, {
+          type: "withdrawal_request",
+          requestId: row.id,
+          userId: row.userId,
+          status: "failed",
+          amountCents: row.amountCents,
+          method,
+        });
+
+        return apiError(c, 502, "WITHDRAW_FAILED", "MonCash payout failed; balance refunded");
+      }
+
+      if (outcome === "ambiguous") {
+        await db
+          .update(withdrawalRequests)
+          .set({ status: "processing", providerTxId: payout.transactionId })
+          .where(eq(withdrawalRequests.id, id));
+        return c.json({
+          id,
+          status: "processing",
+          warning: "Provider response ambiguous — verify before retrying",
+          providerTxId: payout.transactionId,
+        });
+      }
+
+      await db
+        .update(withdrawalRequests)
+        .set({
+          status: "successful",
+          completedAt: new Date(),
+          providerTxId: payout.transactionId,
+        })
+        .where(eq(withdrawalRequests.id, id));
+
+      await notifyGameWalletEvent(row.clientId, {
+        type: "withdrawal_request",
+        requestId: row.id,
+        userId: row.userId,
+        status: "successful",
+        amountCents: row.amountCents,
+        method,
+      });
+
+      return c.json({
+        id,
+        status: "successful",
+        providerTxId: payout.transactionId,
+        dryRun: payout.dryRun ?? false,
+      });
+    } catch (err) {
+      console.error("[admin withdraw approve] provider error", err);
+      await applyLedgerMutation({
+        userId: row.userId,
+        clientId: "platform",
+        environment: row.environment as WalletEnvironment,
+        type: "credit",
+        amountCents: row.amountCents,
+        reason: "moncash_withdraw_refund",
+        referenceId: `refund_${row.referenceId}`,
+      });
+      await db
+        .update(withdrawalRequests)
+        .set({ status: "failed", completedAt: new Date(), adminComment: "Provider error" })
+        .where(eq(withdrawalRequests.id, id));
+      return apiError(
+        c,
+        502,
+        "PAYMENT_PROVIDER_ERROR",
+        err instanceof Error ? err.message : "Withdraw failed",
+      );
+    }
+  },
+);
+
+adminRoutes.post(
+  "/admin/withdrawal-requests/:id/reject",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const admin = c.get("user");
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const comment =
+      typeof body.comment === "string" && body.comment.trim()
+        ? body.comment.trim()
+        : null;
+    if (!comment) {
+      return apiError(c, 400, "COMMENT_REQUIRED", "Rejection reason is required");
+    }
+
+    const row = await db
+      .select()
+      .from(withdrawalRequests)
+      .where(eq(withdrawalRequests.id, id))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!row) return apiError(c, 404, "NOT_FOUND", "Withdrawal request not found");
+    if (row.status !== "pending") {
+      return apiError(c, 409, "NOT_PENDING", "Request is not pending");
+    }
+
+    await applyLedgerMutation({
+      userId: row.userId,
+      clientId: "platform",
+      environment: row.environment as WalletEnvironment,
+      type: "credit",
+      amountCents: row.amountCents,
+      reason: `${row.method}_withdraw_reject_refund`,
+      referenceId: `reject_${row.referenceId}`,
+    });
+
+    await db
+      .update(withdrawalRequests)
+      .set({
+        status: "failed",
+        adminComment: comment,
+        reviewedBy: admin.id,
+        reviewedAt: new Date(),
+        completedAt: new Date(),
+      })
+      .where(eq(withdrawalRequests.id, id));
+
+    await notifyGameWalletEvent(row.clientId, {
+      type: "withdrawal_request",
+      requestId: row.id,
+      userId: row.userId,
+      status: "failed",
+      amountCents: row.amountCents,
+      method: row.method,
+    });
+
+    return c.json({ id, status: "failed" });
+  },
+);
