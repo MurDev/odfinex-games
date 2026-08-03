@@ -1,10 +1,21 @@
 import { Hono } from "hono";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
-import { gameClients, launchTokens, ledgerEntries, sessions } from "@odfinex/db";
+import {
+  depositOrders,
+  gameClients,
+  launchTokens,
+  ledgerEntries,
+  sessions,
+  users,
+  withdrawalRequests,
+} from "@odfinex/db";
 import type { WalletEnvironment } from "@odfinex/shared";
 import {
+  WalletCreditUserRequestSchema,
+  WalletDepositRequestSchema,
   WalletGrantRequestSchema,
   WalletMutationRequestSchema,
+  WalletWithdrawRequestSchema,
 } from "@odfinex/shared";
 
 import { db } from "../db.js";
@@ -24,9 +35,29 @@ import {
   type LaunchAuthVariables,
 } from "../middleware/launch.js";
 import { requireClientSignature } from "../middleware/client-signature.js";
+import {
+  requireS2SClientAuth,
+  type S2SClientVariables,
+} from "../middleware/s2s-client.js";
+import {
+  createPayment,
+  classifyWithdrawOutcome,
+  isBazikMock,
+  splitFullName,
+  withdrawToMoncash,
+} from "../payments/bazik.js";
+import { fulfillDeposit } from "../payments/fulfill-deposit.js";
 
 type LaunchEnv = { Variables: LaunchAuthVariables };
 type PlatformEnv = { Variables: AuthVariables };
+type S2SEnv = { Variables: S2SClientVariables };
+
+const MIN_HTG = 10;
+const MAX_HTG = 75_000;
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/[\s\-]/g, "");
+}
 
 export const walletRoutes = new Hono();
 
@@ -147,7 +178,7 @@ money.post("/wallet/debit", requireLaunchToken, requireClientSignature, async (c
   });
 });
 
-money.post("/wallet/credit", requireLaunchToken, async (c) => {
+money.post("/wallet/credit", requireLaunchToken, requireClientSignature, async (c) => {
   const user = c.get("user");
   const clientId = c.get("clientId");
   const environment = c.get("environment");
@@ -183,6 +214,65 @@ money.post("/wallet/credit", requireLaunchToken, async (c) => {
 });
 
 walletRoutes.route("/", money);
+
+/** S2S credit to offline user (no launch token) */
+const s2s = new Hono<S2SEnv>();
+
+s2s.post("/wallet/credit-user", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const environment = c.get("environment");
+  const walletEnabled = c.get("walletEnabled");
+  const rawBody = c.get("rawBody");
+
+  if (!walletEnabled) {
+    return apiError(c, 403, "GAME_NOT_ALLOWED", "Wallet is disabled for this game");
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return apiError(c, 400, "INVALID_BODY", "Invalid JSON body");
+  }
+
+  const parsed = WalletCreditUserRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "Invalid credit-user request");
+  }
+
+  const target = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, parsed.data.platformUserId))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!target) {
+    return apiError(c, 404, "USER_NOT_FOUND", "platformUserId does not exist");
+  }
+
+  const result = await applyLedgerMutation({
+    userId: target.id,
+    clientId,
+    environment,
+    type: "credit",
+    amountCents: parsed.data.amountCents,
+    reason: parsed.data.reason,
+    referenceId: parsed.data.referenceId,
+  });
+
+  if (!result.ok) {
+    return apiError(c, 409, result.code, result.message);
+  }
+
+  return c.json({
+    txId: result.txId,
+    balanceCents: result.balanceCents,
+    currency: "HTG" as const,
+  });
+});
+
+walletRoutes.route("/", s2s);
 
 const player = new Hono<PlatformEnv>();
 
@@ -268,6 +358,241 @@ player.post("/wallet/grant", requirePlatformSession, async (c) => {
     currency: "HTG" as const,
     environment,
   });
+});
+
+player.post("/wallet/deposit", requirePlatformSession, async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json().catch(() => null);
+  const parsed = WalletDepositRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(
+      c,
+      400,
+      "INVALID_BODY",
+      `Invalid deposit (amount ${MIN_HTG}–${MAX_HTG} HTG)`,
+    );
+  }
+
+  const amountHtg = parsed.data.amountHtg;
+  const amountCents = amountHtg * 100;
+  const referenceId = `dep_${user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const webUrl = (process.env.WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const apiPublic =
+    process.env.API_URL ??
+    process.env.PUBLIC_API_URL ??
+    (process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+      : null) ??
+    "http://localhost:4000";
+  const apiUrl = apiPublic.replace(/\/$/, "");
+
+  let payment;
+  try {
+    payment = await createPayment({
+      gdes: amountHtg,
+      description: "Odfinex Games deposit",
+      referenceId,
+      successUrl: `${webUrl}/wallet/deposit/complete`,
+      errorUrl: `${webUrl}/wallet?deposit=error`,
+      webhookUrl: `${apiUrl}/webhooks/bazik`,
+      metadata: { userId: user.id },
+    });
+  } catch (err) {
+    console.error("[deposit] createPayment failed", err);
+    return apiError(
+      c,
+      502,
+      "PAYMENT_PROVIDER_ERROR",
+      err instanceof Error ? err.message : "Failed to create MonCash payment",
+    );
+  }
+
+  await db.insert(depositOrders).values({
+    userId: user.id,
+    orderId: payment.orderId,
+    amountCents,
+    status: "pending",
+    referenceId,
+    redirectUrl: payment.redirectUrl,
+    environment: "live",
+  });
+
+  return c.json({
+    orderId: payment.orderId,
+    amountCents,
+    redirectUrl: payment.redirectUrl,
+    status: payment.status,
+    mock: isBazikMock(),
+  });
+});
+
+player.post("/wallet/deposit/:orderId/complete", requirePlatformSession, async (c) => {
+  const user = c.get("user");
+  const orderId = c.req.param("orderId");
+
+  const order = await db
+    .select()
+    .from(depositOrders)
+    .where(eq(depositOrders.orderId, orderId))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!order || order.userId !== user.id) {
+    return apiError(c, 404, "NOT_FOUND", "Deposit order not found");
+  }
+
+  const result = await fulfillDeposit(orderId, orderId.startsWith("mock_") ? "mock" : "redirect");
+  if (result.outcome === "error") {
+    return apiError(c, result.retryable ? 502 : 400, "DEPOSIT_FULFILL_FAILED", result.message);
+  }
+  if (result.outcome === "pending") {
+    return c.json({ status: "pending", providerStatus: result.status });
+  }
+
+  const balanceCents = await getBalanceCents(user.id, "live");
+  return c.json({
+    status: "successful",
+    balanceCents,
+    outcome: result.outcome,
+  });
+});
+
+player.post("/wallet/withdraw", requirePlatformSession, async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json().catch(() => null);
+  const parsed = WalletWithdrawRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(
+      c,
+      400,
+      "INVALID_BODY",
+      `Invalid withdraw (amount ${MIN_HTG}–${MAX_HTG} HTG, phone required)`,
+    );
+  }
+
+  const amountHtg = parsed.data.amountHtg;
+  const amountCents = amountHtg * 100;
+  const phone = normalizePhone(parsed.data.phone);
+  if (!/^3\d{7}$/.test(phone) && !/^4\d{7}$/.test(phone)) {
+    return apiError(c, 400, "INVALID_PHONE", "MonCash phone must be 8 digits starting with 3 or 4");
+  }
+
+  const balance = await getBalanceCents(user.id, "live");
+  if (balance < amountCents) {
+    return apiError(c, 402, "INSUFFICIENT_FUNDS", "Insufficient wallet balance");
+  }
+
+  const referenceId = `wd_${user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const debit = await applyLedgerMutation({
+    userId: user.id,
+    clientId: "platform",
+    environment: "live",
+    type: "debit",
+    amountCents,
+    reason: "moncash_withdraw",
+    referenceId,
+  });
+
+  if (!debit.ok) {
+    const status = debit.code === "INSUFFICIENT_FUNDS" ? 402 : 409;
+    return apiError(c, status, debit.code, debit.message);
+  }
+
+  const [inserted] = await db
+    .insert(withdrawalRequests)
+    .values({
+      userId: user.id,
+      amountCents,
+      phone,
+      status: "processing",
+      referenceId,
+      environment: "live",
+    })
+    .returning();
+
+  const names = splitFullName(user.displayName ?? user.email ?? "Player");
+
+  try {
+    const payout = await withdrawToMoncash({
+      gdes: amountHtg,
+      wallet: phone,
+      ...names,
+      referenceId,
+      description: "Odfinex Games withdrawal",
+      customerEmail: user.email ?? undefined,
+    });
+
+    const outcome = classifyWithdrawOutcome(payout.status, payout.transactionId);
+    if (outcome === "failed") {
+      await applyLedgerMutation({
+        userId: user.id,
+        clientId: "platform",
+        environment: "live",
+        type: "credit",
+        amountCents,
+        reason: "moncash_withdraw_refund",
+        referenceId: `refund_${referenceId}`,
+      });
+      await db
+        .update(withdrawalRequests)
+        .set({ status: "failed", completedAt: new Date(), providerTxId: payout.transactionId })
+        .where(eq(withdrawalRequests.id, inserted!.id));
+      return apiError(c, 502, "WITHDRAW_FAILED", "MonCash payout failed; balance refunded");
+    }
+
+    if (outcome === "ambiguous") {
+      await db
+        .update(withdrawalRequests)
+        .set({ status: "processing", providerTxId: payout.transactionId })
+        .where(eq(withdrawalRequests.id, inserted!.id));
+      return c.json({
+        id: inserted!.id,
+        status: "processing",
+        amountCents,
+        providerTxId: payout.transactionId,
+        warning: "Provider response ambiguous — verify before retrying",
+      });
+    }
+
+    await db
+      .update(withdrawalRequests)
+      .set({
+        status: "successful",
+        completedAt: new Date(),
+        providerTxId: payout.transactionId,
+      })
+      .where(eq(withdrawalRequests.id, inserted!.id));
+
+    return c.json({
+      id: inserted!.id,
+      status: "successful",
+      amountCents,
+      providerTxId: payout.transactionId,
+      dryRun: payout.dryRun ?? false,
+    });
+  } catch (err) {
+    console.error("[withdraw] provider error", err);
+    await applyLedgerMutation({
+      userId: user.id,
+      clientId: "platform",
+      environment: "live",
+      type: "credit",
+      amountCents,
+      reason: "moncash_withdraw_refund",
+      referenceId: `refund_${referenceId}`,
+    });
+    await db
+      .update(withdrawalRequests)
+      .set({ status: "failed", completedAt: new Date() })
+      .where(eq(withdrawalRequests.id, inserted!.id));
+    return apiError(
+      c,
+      502,
+      "PAYMENT_PROVIDER_ERROR",
+      err instanceof Error ? err.message : "Withdraw failed",
+    );
+  }
 });
 
 walletRoutes.route("/", player);

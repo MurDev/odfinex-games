@@ -97,7 +97,23 @@ main          →  production (CI + deploys Vercel)
 | `PORT` | `4000` |
 | `WEB_URL` | `https://odfinex-web.vercel.app` |
 | `PLAY_URL` | `https://odfinex-play.vercel.app` |
+| `API_URL` | `https://odfinex-api-production.up.railway.app` (webhookUrl MonCash) |
 | `CORS_ORIGINS` | `https://odfinex-web.vercel.app,https://duelpion-web.vercel.app` |
+| `BAZIK_USER_ID` | Même compte que Ludolakay |
+| `BAZIK_SECRET_KEY` | Même compte que Ludolakay |
+| `BAZIK_WEBHOOK_SECRET` | Même compte que Ludolakay (signature HMAC) |
+
+> MonCash : le `webhookUrl` est envoyé **par requête** à `createPayment` (pas dans le dashboard Bazik).
+> Au boot, `Dockerfile.api` exécute `db:migrate` puis démarre l’API — la migration `0005_moncash`
+> s’applique automatiquement au prochain deploy.
+
+### Checklist deploy MonCash (P3)
+
+1. Code mergé sur `main` (API + web + migration `0005`).
+2. Vars `BAZIK_*` + `API_URL` présentes sur Railway `odfinex-api`.
+3. Deploy Railway vert + `/health` OK.
+4. Deploy Vercel `odfinex-web` (page `/wallet` dépôt/retrait).
+5. Smoke : login Google → `/wallet` → dépôt sandbox → solde ↑ → Duelpion mise VS IA.
 
 ### Vercel (web/admin/play, targets production + preview)
 

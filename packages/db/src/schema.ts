@@ -143,3 +143,51 @@ export const ledgerEntries = pgTable(
   },
   (table) => [unique("ledger_entry_client_ref_unique").on(table.clientId, table.referenceId)],
 );
+
+/** MonCash deposit orders (Bazik) */
+export const depositOrders = pgTable(
+  "deposit_order",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    orderId: text("order_id").notNull().unique(),
+    amountCents: integer("amount_cents").notNull(),
+    status: text("status").notNull().default("pending"), // pending | successful | failed | cancelled
+    referenceId: text("reference_id").notNull().unique(),
+    redirectUrl: text("redirect_url"),
+    environment: environmentEnum("environment").notNull().default("live"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { mode: "date" }),
+  },
+);
+
+/** MonCash withdrawal requests */
+export const withdrawalRequests = pgTable(
+  "withdrawal_request",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amountCents: integer("amount_cents").notNull(),
+    phone: text("phone").notNull(),
+    status: text("status").notNull().default("pending"), // pending | processing | successful | failed
+    referenceId: text("reference_id").notNull().unique(),
+    providerTxId: text("provider_tx_id"),
+    environment: environmentEnum("environment").notNull().default("live"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { mode: "date" }),
+  },
+);
+
+/** Processed Bazik webhook event ids (idempotency) */
+export const webhookEvents = pgTable("webhook_event", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});

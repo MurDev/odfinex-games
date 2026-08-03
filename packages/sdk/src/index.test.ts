@@ -142,4 +142,45 @@ describe("OdfinexGamesClient", () => {
     expect(res.txId).toBe("t1");
     expect(res.balanceCents).toBe(200);
   });
+
+  it("creditToUser requires clientSecret and posts to credit-user", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(_url).toBe("http://localhost:4000/v1/wallet/credit-user");
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["x-client-id"]).toBe("duelpion.live");
+      expect(headers["x-client-secret"]).toBe("sec");
+      expect(headers["x-client-signature"]).toBeTruthy();
+      return Response.json({ txId: "t2", balanceCents: 50, currency: "HTG" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+      clientSecret: "sec",
+    });
+    const res = await client.creditToUser({
+      platformUserId: "user-1",
+      amountCents: 50,
+      reason: "referral",
+      referenceId: "comm_1",
+    });
+    expect(res.txId).toBe("t2");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("creditToUser fails without clientSecret", async () => {
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+    });
+    await expect(
+      client.creditToUser({
+        platformUserId: "u",
+        amountCents: 1,
+        reason: "r",
+        referenceId: "x",
+      }),
+    ).rejects.toMatchObject({ code: "MISSING_CLIENT_SECRET" });
+  });
 });

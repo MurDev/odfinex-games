@@ -163,6 +163,48 @@ export class OdfinexGamesClient {
     return this.mutate("credit", input);
   }
 
+  /**
+   * S2S credit to a platform user who may be offline (no launch token).
+   * Requires `clientSecret`. Used for referral commissions and similar payouts.
+   */
+  async creditToUser(input: {
+    platformUserId: string;
+    amountCents: number;
+    reason: string;
+    referenceId: string;
+  }): Promise<WalletMutationResponse> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(
+        401,
+        "MISSING_CLIENT_SECRET",
+        "clientSecret is required for creditToUser",
+      );
+    }
+
+    const timestamp = Date.now().toString();
+    const body = JSON.stringify(input);
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+
+    const res = await fetch(`${this.baseUrl}/v1/wallet/credit-user`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-client-id": this.clientId,
+        "x-client-secret": this.clientSecret,
+        "x-timestamp": timestamp,
+        "x-client-signature": signature,
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/wallet/credit-user failed (${res.status})`);
+    }
+
+    return WalletMutationResponseSchema.parse(await res.json());
+  }
+
   private async mutate(
     kind: "debit" | "credit",
     input: WalletMutationRequest,
@@ -205,10 +247,12 @@ export {
   WalletBalanceSchema,
   WalletMutationRequestSchema,
   WalletMutationResponseSchema,
+  WalletCreditUserRequestSchema,
   type HealthResponse,
   type User,
   type SessionResponse,
   type WalletBalance,
   type WalletMutationRequest,
   type WalletMutationResponse,
+  type WalletCreditUserRequest,
 } from "@odfinex/shared";

@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { GrantButton } from "./grant-button";
+import { DepositForm } from "./deposit-form";
+import { WithdrawForm } from "./withdraw-form";
 
 const apiUrl = (
   process.env.API_URL ??
@@ -12,10 +14,15 @@ function formatHtg(cents: number) {
   return `${(cents / 100).toFixed(2)} HTG`;
 }
 
-export default async function WalletPage() {
+export default async function WalletPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ deposit?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login?returnTo=/wallet");
 
+  const sp = searchParams ? await searchParams : {};
   const cookieHeader = await getCookieHeader();
 
   const [balanceRes, txRes] = await Promise.all([
@@ -60,8 +67,17 @@ export default async function WalletPage() {
       </p>
       <h1 style={{ fontSize: "1.75rem", margin: "0.5rem 0 0.25rem" }}>Mon solde</h1>
       <p style={{ opacity: 0.65, marginBottom: "1.5rem" }}>
-        Ledger Odfinex Games — dépôts / retraits bientôt.
+        Ledger Odfinex Games — dépôts et retraits MonCash.
       </p>
+
+      {sp.deposit === "ok" && (
+        <p style={{ color: "#34d399", marginBottom: "1rem" }}>Dépôt confirmé.</p>
+      )}
+      {sp.deposit === "error" && (
+        <p style={{ color: "#f87171", marginBottom: "1rem" }}>
+          Le paiement MonCash a échoué ou a été annulé.
+        </p>
+      )}
 
       <div
         style={{
@@ -78,6 +94,8 @@ export default async function WalletPage() {
         </p>
       </div>
 
+      <DepositForm />
+      <WithdrawForm />
       <GrantButton />
 
       <h2 style={{ fontSize: "1.1rem", margin: "2rem 0 0.75rem" }}>Transactions</h2>

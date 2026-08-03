@@ -169,13 +169,16 @@ Demo : `http://localhost:3000/launch/sandbox` (boutons Debit/Credit).
 | `GET` | `/v1/wallet` | Launch **ou** session |
 | `POST` | `/v1/wallet/debit` | Launch + HMAC S2S (`clientSecret`) |
 | `POST` | `/v1/wallet/credit` | Launch + HMAC S2S (`clientSecret`) |
+| `POST` | `/v1/wallet/credit-user` | HMAC S2S seul (`X-Client-Id` + secret) — pas de launch token |
+| `POST` | `/v1/wallet/deposit` | Session — crée un paiement MonCash (Bazik) |
+| `POST` | `/v1/wallet/withdraw` | Session — débit + payout MonCash |
 | `GET` | `/v1/wallet/transactions` | Session |
-| `POST` | `/v1/wallet/grant` | Session, non-prod |
+| `POST` | `/v1/wallet/grant` | Session, non-prod live |
+| `POST` | `/webhooks/bazik` | Signature Bazik |
 
 ## Hors scope (plus tard)
 
-- Publication npm du SDK
 - Domaines production (`odfinexgames`, `play.odfinexgames`)
-- MonCash dépôts / retraits
+- Catalogue web riche (Phase 3)
 
-Voir aussi : [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`PHASE-1.md`](./PHASE-1.md), [`PHASE-2.md`](./PHASE-2.md), [`SECURITY-PHASE-2.md`](./SECURITY-PHASE-2.md).
+Voir aussi : [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`PHASE-1.md`](./PHASE-1.md), [`PHASE-2.md`](./PHASE-2.md), [`SECURITY-PHASE-2.md`](./SECURITY-PHASE-2.md), [`S2S-AUTH.md`](./S2S-AUTH.md).

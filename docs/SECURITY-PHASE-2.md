@@ -18,18 +18,20 @@ Complète [`SECURITY-PHASE-1.md`](./SECURITY-PHASE-1.md). Périmètre : ledger +
 | Endpoint | Qui |
 |---|---|
 | `GET /v1/wallet` | Launch Bearer **ou** cookie session |
-| `POST …/debit` / `…/credit` | **Launch Bearer** uniquement + walletEnabled |
+| `POST …/debit` / `…/credit` | **Launch Bearer** + HMAC S2S (`client_secret`) + walletEnabled |
+| `POST …/credit-user` | HMAC S2S seul (pas de launch token) — crédit offline par `platformUserId` |
 | `GET …/transactions`, `POST …/grant` | Session plateforme uniquement |
 
 ## Limites assumées (Phase 2)
 
-- Debit/credit depuis le client jeu (Bearer launch) — acceptable first-party / local ; **pas** de preuve serveur jeu (`client_secret`) encore.
+- Debit/credit exigent le `client_secret` du serveur jeu (HMAC) — un launch token seul ne suffit plus.
 - Pas de rate-limit dédié wallet.
 - Pas de freeze / risk / audit admin.
 
 ## Checklist ops
 
-- [ ] Ne jamais activer `grant` en prod
+- [ ] Ne jamais activer `grant` en prod live
 - [ ] N’activer `walletEnabled` que pour les jeux de confiance
 - [ ] Surveiller collisions `referenceId` (bugs client)
-- [ ] Avant paiement réel : Phase 2.1 (MonCash) + revue S2S
+- [x] S2S HMAC sur debit **et** credit
+- [ ] Avant argent réel : MonCash dépôts/retraits configurés (`BAZIK_*`)

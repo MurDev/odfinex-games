@@ -10,6 +10,7 @@ import { sessionRoutes } from "./routes/session.js";
 import { gamesRoutes } from "./routes/games.js";
 import { walletRoutes } from "./routes/wallet.js";
 import { adminRoutes } from "./routes/admin.js";
+import { webhookRoutes } from "./routes/webhooks.js";
 
 const app = new Hono();
 const port = Number(process.env.PORT ?? 4000);
@@ -29,6 +30,7 @@ app.use(
     allowHeaders: [
       "Content-Type",
       "Authorization",
+      "x-client-id",
       "x-client-secret",
       "x-timestamp",
       "x-client-signature",
@@ -60,8 +62,12 @@ app.get("/", (c) =>
       "GET /v1/wallet",
       "POST /v1/wallet/debit",
       "POST /v1/wallet/credit",
+      "POST /v1/wallet/credit-user",
+      "POST /v1/wallet/deposit",
+      "POST /v1/wallet/withdraw",
       "GET /v1/wallet/transactions",
       "POST /v1/wallet/grant",
+      "POST /webhooks/bazik",
       "GET /v1/admin/stats",
       "GET /v1/admin/games",
       "POST /v1/admin/games",
@@ -81,6 +87,7 @@ v1.route("/", gamesRoutes);
 v1.route("/", walletRoutes);
 v1.route("/", adminRoutes);
 app.route("/v1", v1);
+app.route("/webhooks", webhookRoutes);
 
 export { app };
 

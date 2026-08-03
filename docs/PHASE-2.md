@@ -40,8 +40,8 @@ Ledger plateforme (autorité argent) + SDK `getBalance` / `debit` / `credit` + U
 | Méthode | Route | Auth |
 |---------|-------|------|
 | `GET` | `/v1/wallet` | launch **ou** session |
-| `POST` | `/v1/wallet/debit` | launch + walletEnabled |
-| `POST` | `/v1/wallet/credit` | launch + walletEnabled |
+| `POST` | `/v1/wallet/debit` | launch + walletEnabled + HMAC S2S |
+| `POST` | `/v1/wallet/credit` | launch + walletEnabled + HMAC S2S |
 | `GET` | `/v1/wallet/transactions` | session |
 | `POST` | `/v1/wallet/grant` | session, non-prod |
 
@@ -85,6 +85,8 @@ pnpm --filter @odfinex/play dev
 
 ## Suite (Phase 2.1+)
 
-MonCash dépôts/retraits, webhooks, hardening S2S, consommation DUELPION.
+- [x] HMAC S2S sur credit (aligné debit)
+- [x] MonCash dépôts / retraits (Bazik)
+- [x] `POST /v1/wallet/credit-user` pour commissions hors-session
 
-Voir aussi : [`SDK-INTEGRATION.md`](./SDK-INTEGRATION.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`SECURITY-PHASE-2.md`](./SECURITY-PHASE-2.md).
+Voir aussi : [`SDK-INTEGRATION.md`](./SDK-INTEGRATION.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`SECURITY-PHASE-2.md`](./SECURITY-PHASE-2.md), [`S2S-AUTH.md`](./S2S-AUTH.md).

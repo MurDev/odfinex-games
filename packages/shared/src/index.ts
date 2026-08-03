@@ -97,6 +97,51 @@ export const WalletMutationResponseSchema = z.object({
 
 export type WalletMutationResponse = z.infer<typeof WalletMutationResponseSchema>;
 
+/** S2S credit to a user who is not in-session (e.g. referral commission) */
+export const WalletCreditUserRequestSchema = z.object({
+  platformUserId: z.string().min(1).max(128),
+  amountCents: z.number().int().positive(),
+  reason: z.string().min(1).max(64),
+  referenceId: z.string().min(1).max(128),
+});
+
+export type WalletCreditUserRequest = z.infer<typeof WalletCreditUserRequestSchema>;
+
+export const WalletDepositRequestSchema = z.object({
+  amountHtg: z.number().int().min(10).max(75_000),
+});
+
+export type WalletDepositRequest = z.infer<typeof WalletDepositRequestSchema>;
+
+export const WalletDepositResponseSchema = z.object({
+  orderId: z.string(),
+  amountCents: z.number().int().positive(),
+  redirectUrl: z.string().url(),
+  status: z.string(),
+});
+
+export type WalletDepositResponse = z.infer<typeof WalletDepositResponseSchema>;
+
+export const WalletWithdrawRequestSchema = z.object({
+  amountHtg: z.number().int().min(10).max(75_000),
+  phone: z
+    .string()
+    .min(8)
+    .max(20)
+    .regex(/^[0-9+\-\s]+$/, "Invalid phone"),
+});
+
+export type WalletWithdrawRequest = z.infer<typeof WalletWithdrawRequestSchema>;
+
+export const WalletWithdrawResponseSchema = z.object({
+  id: z.string(),
+  status: z.string(),
+  amountCents: z.number().int().positive(),
+  providerTxId: z.string().nullable().optional(),
+});
+
+export type WalletWithdrawResponse = z.infer<typeof WalletWithdrawResponseSchema>;
+
 export const WalletGrantRequestSchema = z.object({
   amountCents: z.number().int().positive().max(100_000_00),
   reason: z.string().min(1).max(64).optional().default("grant"),

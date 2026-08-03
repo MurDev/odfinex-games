@@ -126,29 +126,25 @@ L'API verifie :
 
 ---
 
-## Évolution : modèle 2 environnements (sandbox / live)
+## Crédit offline (`POST /v1/wallet/credit-user`)
 
-> **Statut** : décision, non implémenté. Suivi : [`ROADMAP.md`](./ROADMAP.md).
+Pour les payouts hors-session (ex. commission parrainage), le serveur jeu appelle :
 
-Pour suivre le modèle des grandes plateformes (Stripe, PayPal, …), chaque jeu exposera
-**deux environnements**, chacun avec **sa propre paire `clientId` / `client_secret`** :
+```
+POST /v1/wallet/credit-user
+  X-Client-Id: <clientId>
+  X-Client-Secret: <raw-secret>
+  X-Timestamp: <unix-ms>
+  X-Client-Signature: HMAC-SHA256(body + "." + timestamp, secret)
+  Body: { platformUserId, amountCents, reason, referenceId }
+```
 
-| Environnement | Usage | Credentials |
-|---|---|---|
-| `sandbox` | Développement / tests du jeu | paire 1 (`clientId_sandbox` + `client_secret_sandbox`) |
-| `live` | Production (vrais joueurs, vrai argent) | paire 2 (`clientId_live` + `client_secret_live`) |
+Pas de launch token — le bénéficiaire n’a pas besoin d’être connecté. L’environnement wallet
+(`sandbox` | `live`) est celui du `game_client` identifié par `X-Client-Id`.
 
-### Implications à prévoir
+## Modèle 2 environnements (sandbox / live)
 
-- **Schema `game_client`** : ajouter un champ `environment` (`sandbox` | `live`) ou restructurer en
-  « un jeu = une fiche + 2 credentials ».
-- **`clientId`** : préfixé par environnement (ex. `duelpion.sandbox`, `duelpion.live`) ou distinct
-  par paire, l'essentiel étant que chaque paire de credentials est scellée à un environnement.
-- **`launchUrl` / `redirectUrls`** : par environnement (`http://localhost:3002` pour sandbox,
-  `https://duelpion.vercel.app` pour live).
-- **Admin UI** : onglet ou section « Environnements » sur la fiche jeu, boutons
-  « Générer un secret » par environnement.
-- **SDK** : le développeur choisit la paire à embarquer selon son environnement de build
-  (`ODFINEX_CLIENT_ID` + `ODFINEX_CLIENT_SECRET` par env).
-- **Sandbox** : transactions marquées sans valeur réelle (déjà le cas via `POST /v1/wallet/grant`).
-- **Sécurité** : le secret `live` ne doit jamais apparaître en sandbox ; rotation indépendante par paire.
+> **Statut** : implémenté. Voir [`ROADMAP.md`](./ROADMAP.md).
+
+Chaque jeu a **deux paires** `clientId` / `client_secret` (`{slug}.sandbox`, `{slug}.live`),
+wallet isolé par environnement, grant sandbox-only en production.

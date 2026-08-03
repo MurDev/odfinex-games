@@ -29,7 +29,9 @@
 |---|---|---|---|
 | **P1** | **Vérifier le flux S2S complet en prod** | ✅ | Validé : launch → token → mutation wallet signée (non signée 401, mauvais secret 403, timestamp périmé 401), isolation sandbox/live OK |
 | P2 | Domaine personnalisé | À faire | `odfinexgames` → web, `play.odfinexgames` → play (Vercel custom domain) |
-| P3 | Paiements MonCash | À faire | Dépôts / retraits sur le wallet |
+| P3 | Paiements MonCash | ✅ | Dépôts / retraits Bazik + UI `/wallet` + webhook `/webhooks/bazik` ; mock local sans credentials |
+| P3b | Credit S2S offline | ✅ | `POST /v1/wallet/credit-user` + SDK `creditToUser` (parrainage) |
+| P3c | Credit HMAC obligatoire | ✅ | `requireClientSignature` sur debit **et** credit |
 | P4 | Catalogue web riche (Phase 3) | À faire | Listes, détails jeu, profils joueurs |
 
 ## Décisions en attente
