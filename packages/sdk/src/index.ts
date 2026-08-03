@@ -2,16 +2,20 @@
  * @odfinex/games-sdk — identity + wallet client for external games.
  */
 import {
+  ClientTransactionsResponseSchema,
   SessionResponseSchema,
   WalletBalanceSchema,
   WalletDepositCompleteResponseSchema,
   WalletDepositResponseSchema,
   WalletMutationResponseSchema,
+  WalletTransactionsResponseSchema,
+  type ClientTransactionsResponse,
   type SessionResponse,
   type User,
   type WalletBalance,
   type WalletMutationRequest,
   type WalletMutationResponse,
+  type WalletTransactionsResponse,
 } from "@odfinex/shared";
 
 export type OdfinexGamesClientOptions = {
@@ -155,6 +159,83 @@ export class OdfinexGamesClient {
     }
 
     return WalletBalanceSchema.parse(await res.json());
+  }
+
+  /** Player ledger history (launch token). Source of truth: Platform API. */
+  async getTransactions(opts?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<WalletTransactionsResponse> {
+    const token = this.requireToken();
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    const qs = params.toString();
+    const res = await fetch(
+      `${this.baseUrl}/v1/wallet/transactions${qs ? `?${qs}` : ""}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+
+    if (!res.ok) {
+      return this.parseError(res, `GET /v1/wallet/transactions failed (${res.status})`);
+    }
+
+    return WalletTransactionsResponseSchema.parse(await res.json());
+  }
+
+  /**
+   * S2S game-admin ledger (this client + related platform deposits).
+   * Requires `clientSecret`. Signs an empty body (GET).
+   */
+  async listClientTransactions(opts?: {
+    limit?: number;
+    offset?: number;
+    type?: "debit" | "credit";
+    player?: string;
+  }): Promise<ClientTransactionsResponse> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(
+        401,
+        "MISSING_CLIENT_SECRET",
+        "clientSecret is required for listClientTransactions",
+      );
+    }
+
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    if (opts?.type) params.set("type", opts.type);
+    if (opts?.player) params.set("player", opts.player);
+    const qs = params.toString();
+
+    const timestamp = Date.now().toString();
+    const body = "";
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+
+    const res = await fetch(
+      `${this.baseUrl}/v1/client/transactions${qs ? `?${qs}` : ""}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "x-client-id": this.clientId,
+          "x-client-secret": this.clientSecret,
+          "x-timestamp": timestamp,
+          "x-client-signature": signature,
+        },
+      },
+    );
+
+    if (!res.ok) {
+      return this.parseError(res, `GET /v1/client/transactions failed (${res.status})`);
+    }
+
+    return ClientTransactionsResponseSchema.parse(await res.json());
   }
 
   async debit(input: WalletMutationRequest): Promise<WalletMutationResponse> {
@@ -320,6 +401,8 @@ export {
   WalletDepositRequestSchema,
   WalletDepositResponseSchema,
   WalletDepositCompleteResponseSchema,
+  WalletTransactionsResponseSchema,
+  ClientTransactionsResponseSchema,
   type HealthResponse,
   type User,
   type SessionResponse,
@@ -330,4 +413,8 @@ export {
   type WalletDepositRequest,
   type WalletDepositResponse,
   type WalletDepositCompleteResponse,
+  type WalletTransactionsResponse,
+  type ClientTransactionsResponse,
+  type LedgerEntry,
+  type ClientLedgerEntry,
 } from "@odfinex/shared";

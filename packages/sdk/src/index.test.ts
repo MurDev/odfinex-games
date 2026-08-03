@@ -102,6 +102,64 @@ describe("OdfinexGamesClient", () => {
     expect(bal).toEqual({ balanceCents: 1500, currency: "HTG" });
   });
 
+  it("getTransactions calls wallet transactions with Bearer token", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://localhost:4000/v1/wallet/transactions?limit=10");
+      expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer tok");
+      return Response.json({
+        items: [
+          {
+            id: "tx1",
+            type: "credit",
+            amountCents: 1000,
+            balanceAfterCents: 1000,
+            reason: "moncash_deposit",
+            clientId: "platform",
+            environment: "live",
+            referenceId: "dep_1",
+            createdAt: "2026-08-03T00:00:00.000Z",
+          },
+        ],
+        total: 1,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+      sessionToken: "tok",
+    });
+    const res = await client.getTransactions({ limit: 10 });
+    expect(res.total).toBe(1);
+    expect(res.items[0]?.reason).toBe("moncash_deposit");
+  });
+
+  it("listClientTransactions signs empty body and requires secret", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toContain("/v1/client/transactions");
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["x-client-id"]).toBe("duelpion.live");
+      expect(headers["x-client-signature"]).toBeTruthy();
+      return Response.json({ items: [], total: 0, limit: 30, offset: 0 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+      clientSecret: "sec",
+    });
+    const res = await client.listClientTransactions({ limit: 30 });
+    expect(res.total).toBe(0);
+
+    const bare = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+    });
+    await expect(bare.listClientTransactions()).rejects.toMatchObject({
+      code: "MISSING_CLIENT_SECRET",
+    });
+  });
+
   it("debit throws INSUFFICIENT_FUNDS", async () => {
     vi.stubGlobal(
       "fetch",

@@ -122,6 +122,9 @@ Prérequis : `game_client.walletEnabled === true`, un launch token valide, et `c
 const bal = await client.getBalance();
 // { balanceCents: number, currency: "HTG" }
 
+const history = await client.getTransactions({ limit: 50 });
+// { items: LedgerEntry[], total }
+
 await client.debit({
   amountCents: 100, // 1 HTG
   reason: "bet",
@@ -173,7 +176,8 @@ Demo : `http://localhost:3000/launch/sandbox` (boutons Debit/Credit).
 | `POST` | `/v1/wallet/deposit` | Launch **ou** session — crée paiement MonCash (body: amountHtg, successUrl, errorUrl) |
 | `POST` | `/v1/wallet/deposit/:orderId/complete` | Launch **ou** session — confirme après retour MonCash |
 | `POST` | `/v1/wallet/withdraw` | Session — débit + payout MonCash |
-| `GET` | `/v1/wallet/transactions` | Session |
+| `GET` | `/v1/wallet/transactions` | Launch **ou** session |
+| `GET` | `/v1/client/transactions` | HMAC S2S seul — ledger filtré pour ce `clientId` (+ dépôts platform liés) |
 | `POST` | `/v1/wallet/grant` | Session, non-prod live |
 | `POST` | `/webhooks/bazik` | Signature Bazik |
 

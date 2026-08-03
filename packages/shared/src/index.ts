@@ -188,6 +188,26 @@ export type WalletTransactionsResponse = z.infer<
   typeof WalletTransactionsResponseSchema
 >;
 
+/** Game-admin S2S ledger row (includes user identity). */
+export const ClientLedgerEntrySchema = LedgerEntrySchema.extend({
+  userId: z.string(),
+  displayName: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+});
+
+export type ClientLedgerEntry = z.infer<typeof ClientLedgerEntrySchema>;
+
+export const ClientTransactionsResponseSchema = z.object({
+  items: z.array(ClientLedgerEntrySchema),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().nonnegative().optional(),
+  offset: z.number().int().nonnegative().optional(),
+});
+
+export type ClientTransactionsResponse = z.infer<
+  typeof ClientTransactionsResponseSchema
+>;
+
 /* ─── Admin schemas ─── */
 
 export const AdminStatsSchema = z.object({

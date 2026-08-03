@@ -278,20 +278,105 @@ s2s.post("/wallet/credit-user", requireS2SClientAuth, async (c) => {
   });
 });
 
+/**
+ * Game-admin ledger (S2S): rows for this clientId, plus platform
+ * deposits/withdrawals for users who already interacted with this client.
+ */
+s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const limit = Math.min(Number(c.req.query("limit") ?? 30) || 30, 100);
+  const offset = Number(c.req.query("offset") ?? 0) || 0;
+  const typeFilter = c.req.query("type");
+  const playerFilter = c.req.query("player");
+
+  let whereClause = and(
+    sql`(
+      ${ledgerEntries.clientId} = ${clientId}
+      OR (
+        ${ledgerEntries.clientId} = 'platform'
+        AND ${ledgerEntries.userId} IN (
+          SELECT user_id FROM ledger_entry WHERE client_id = ${clientId}
+          UNION
+          SELECT user_id FROM launch_token WHERE client_id = ${clientId}
+        )
+      )
+    )`,
+  );
+
+  if (typeFilter === "debit" || typeFilter === "credit") {
+    whereClause = and(whereClause, eq(ledgerEntries.type, typeFilter));
+  }
+  if (playerFilter) {
+    whereClause = and(whereClause, eq(ledgerEntries.userId, playerFilter));
+  }
+
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(ledgerEntries)
+    .where(whereClause);
+
+  const items = await db
+    .select({
+      id: ledgerEntries.id,
+      userId: ledgerEntries.userId,
+      type: ledgerEntries.type,
+      amountCents: ledgerEntries.amountCents,
+      balanceAfterCents: ledgerEntries.balanceAfterCents,
+      reason: ledgerEntries.reason,
+      clientId: ledgerEntries.clientId,
+      environment: ledgerEntries.environment,
+      referenceId: ledgerEntries.referenceId,
+      createdAt: ledgerEntries.createdAt,
+      displayName: users.name,
+      email: users.email,
+    })
+    .from(ledgerEntries)
+    .leftJoin(users, eq(ledgerEntries.userId, users.id))
+    .where(whereClause)
+    .orderBy(desc(ledgerEntries.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return c.json({
+    items: items.map((tx) => ({
+      id: tx.id,
+      userId: tx.userId,
+      displayName: tx.displayName,
+      email: tx.email,
+      type: tx.type as "debit" | "credit",
+      amountCents: tx.amountCents,
+      balanceAfterCents: tx.balanceAfterCents,
+      reason: tx.reason,
+      clientId: tx.clientId,
+      environment: tx.environment as WalletEnvironment,
+      referenceId: tx.referenceId,
+      createdAt: tx.createdAt.toISOString(),
+    })),
+    total: totalRow?.count ?? 0,
+    limit,
+    offset,
+  });
+});
+
 walletRoutes.route("/", s2s);
 
 const player = new Hono<PlatformEnv>();
 
-player.get("/wallet/transactions", requirePlatformSession, async (c) => {
-  const user = c.get("user");
-  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
+/** Player ledger — launch token (game) OR platform session (web). */
+walletRoutes.get("/wallet/transactions", async (c) => {
+  const ctx = await resolveWalletContext(c);
+  if (!ctx) {
+    return apiError(c, 401, "UNAUTHORIZED", "Missing session or launch token");
+  }
+
+  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 100);
   const offset = Number(c.req.query("offset") ?? 0) || 0;
 
-  await ensureWallet(user.id, "live");
+  await ensureWallet(ctx.userId, ctx.environment);
 
   const whereClause = and(
-    eq(ledgerEntries.userId, user.id),
-    eq(ledgerEntries.environment, "live"),
+    eq(ledgerEntries.userId, ctx.userId),
+    eq(ledgerEntries.environment, ctx.environment),
   );
 
   const items = await db
