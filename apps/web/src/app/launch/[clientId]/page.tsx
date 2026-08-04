@@ -7,27 +7,25 @@ type PageProps = {
   params: Promise<{ clientId: string }>;
 };
 
+function googleStartUrl(clientId: string) {
+  const url = new URL("/api/auth/google", process.env.AUTH_URL ?? "http://localhost:3000");
+  url.searchParams.set("returnTo", `/launch/${encodeURIComponent(clientId)}`);
+  return url.toString();
+}
+
 export default async function LaunchPage({ params }: PageProps) {
   const { clientId } = await params;
 
   const sessionToken = await getPlatformSessionToken();
   if (!sessionToken) {
-    const login = new URL("/login", process.env.AUTH_URL ?? "http://localhost:3000");
-    login.searchParams.set("returnTo", `/launch/${encodeURIComponent(clientId)}`);
-    login.searchParams.set("clientId", clientId);
-    login.searchParams.set("provider", "google");
-    redirect(login.toString());
+    redirect(googleStartUrl(clientId));
   }
 
   const result = await createLaunch(clientId, sessionToken);
 
   if (!result.ok) {
     if (result.status === 401) {
-      const login = new URL("/login", process.env.AUTH_URL ?? "http://localhost:3000");
-      login.searchParams.set("returnTo", `/launch/${encodeURIComponent(clientId)}`);
-      login.searchParams.set("clientId", clientId);
-      login.searchParams.set("provider", "google");
-      redirect(login.toString());
+      redirect(googleStartUrl(clientId));
     }
 
     return (

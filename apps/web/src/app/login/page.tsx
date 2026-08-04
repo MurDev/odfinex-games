@@ -1,7 +1,11 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { AutoGoogleSignIn } from "@/components/auto-google-signin";
 import { signInWithGoogle } from "./actions";
+
+function safeReturnTo(raw: string | undefined): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/me";
+  return raw;
+}
 
 export default async function LoginPage({
   searchParams,
@@ -17,20 +21,20 @@ export default async function LoginPage({
   const params = await searchParams;
 
   if (session?.user) {
-    redirect(params.returnTo ?? "/me");
+    redirect(safeReturnTo(params.returnTo));
   }
 
-  const returnTo = params.returnTo ?? "/me";
+  const returnTo = safeReturnTo(params.returnTo);
   const clientId = params.clientId ?? "";
   const googleConfigured = Boolean(
     process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
   );
 
-  // Direct Google OAuth (skip Odfinex login UI) when launched from a game.
-  // Must go through a Server Action (auto-submit), not RSC render — Auth.js
-  // sets CSRF cookies which Next.js forbids outside actions / route handlers.
+  // Game / SDK path: skip Odfinex UI — Route Handler starts Google OAuth.
   if (params.provider === "google" && !params.error && googleConfigured) {
-    return <AutoGoogleSignIn returnTo={returnTo} action={signInWithGoogle} />;
+    const google = new URL("/api/auth/google", process.env.AUTH_URL ?? "http://localhost:3000");
+    google.searchParams.set("returnTo", returnTo);
+    redirect(google.toString());
   }
 
   return (
