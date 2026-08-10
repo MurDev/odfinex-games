@@ -35,3 +35,5 @@ Complète [`SECURITY-PHASE-1.md`](./SECURITY-PHASE-1.md). Périmètre : ledger +
 - [ ] Surveiller collisions `referenceId` (bugs client)
 - [x] S2S HMAC sur debit **et** credit
 - [ ] Avant argent réel : MonCash dépôts/retraits configurés (`BAZIK_*`)
+- [x] NatCash : config `payment_rail_config` + approve admin only (pas d’approve S2S jeu)
+- [x] Retraits : hold + file pending ; reject = refund ; notify HMAC jeux (`ODFINEX_NOTIFY_SECRET`)

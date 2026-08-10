@@ -21,6 +21,7 @@ export const users = pgTable("user", {
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  allowSelfReview: boolean("allow_self_review").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 

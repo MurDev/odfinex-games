@@ -26,6 +26,7 @@ type Item = {
   adminComment: string | null;
   clientId: string | null;
   createdAt: string;
+  isSelf?: boolean;
 };
 
 export default function DepositRequestsPage() {
@@ -56,8 +57,8 @@ export default function DepositRequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  async function act(id: string, action: "approve" | "reject") {
-    setBusy(id);
+  async function act(item: Item, action: "approve" | "reject") {
+    setBusy(item.id);
     setError("");
     try {
       let comment: string | undefined;
@@ -68,7 +69,17 @@ export default function DepositRequestsPage() {
           return;
         }
       }
-      const res = await fetch(`/api/proxy/admin/deposit-requests/${id}/${action}`, {
+      if (item.isSelf) {
+        const msg =
+          action === "approve"
+            ? "C'est VOTRE demande de depot. Vérifiez la preuve de paiement avant de confirmer."
+            : "C'est VOTRE demande de depot. Voulez-vous vraiment la rejeter ?";
+        if (!window.confirm(msg)) {
+          setBusy(null);
+          return;
+        }
+      }
+      const res = await fetch(`/api/proxy/admin/deposit-requests/${item.id}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(action === "reject" ? { comment } : {}),
@@ -126,7 +137,14 @@ export default function DepositRequestsPage() {
                 {items.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>
-                      <div className="text-sm font-medium">{item.displayName ?? "—"}</div>
+                      <div className="text-sm font-medium">
+                        {item.displayName ?? "—"}
+                        {item.isSelf && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            votre demande
+                          </Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">{item.email}</div>
                     </TableCell>
                     <TableCell>{formatHtg(item.amountCents)}</TableCell>
@@ -159,7 +177,7 @@ export default function DepositRequestsPage() {
                           <Button
                             size="sm"
                             disabled={busy === item.id}
-                            onClick={() => void act(item.id, "approve")}
+                            onClick={() => void act(item, "approve")}
                           >
                             Approuver
                           </Button>
@@ -167,7 +185,7 @@ export default function DepositRequestsPage() {
                             size="sm"
                             variant="outline"
                             disabled={busy === item.id}
-                            onClick={() => void act(item.id, "reject")}
+                            onClick={() => void act(item, "reject")}
                           >
                             Rejeter
                           </Button>

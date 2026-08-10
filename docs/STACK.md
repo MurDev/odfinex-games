@@ -34,7 +34,7 @@ Détails : [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 | Cache / sessions scale | Redis (quand nécessaire) |
 | Wallet | Ledger Postgres + APIs debit/credit idempotents (Phase 2) — fait, reste l'activation par jeu |
 | Domaine perso | `odfinexgames` / `play.odfinexgames` (Vercel custom domains) |
-| Paiements | MonCash dépôts / retraits |
+| Paiements | MonCash (Bazik) + NatCash manuel + file retraits dual-admin |
 
 ## Notes locales
 

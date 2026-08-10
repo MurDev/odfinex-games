@@ -36,7 +36,7 @@ DUELPION (web app)
 | Service | Hébergeur | Rôle | URL |
 |---|---|---|---|
 | `odfinex-web` | Vercel | Catalogue, login Google, profil | https://odfinex-web.vercel.app |
-| `odfinex-admin` | Vercel | Admin (jeux, joueurs, transactions) | https://odfinex-admin.vercel.app |
+| `odfinex-admin` | Vercel | Admin (jeux, joueurs, transactions, payment-rails, deposit/withdrawal requests) | https://odfinex-admin.vercel.app |
 | `odfinex-play` | Vercel | Surface sandbox SDK (lit `?token=` depuis l'URL) | https://odfinex-play.vercel.app |
 | `odfinex-api` | Railway | Hono API (identity, launch, wallet) | https://odfinex-api-production.up.railway.app |
 | Postgres | Railway | Base de données | interne, service `Postgres` |
@@ -86,6 +86,9 @@ main          →  production (CI + deploys Vercel)
 - `CMD`: `db:migrate` puis `pnpm --filter @odfinex/api start` (tsx).
 - `railway.json`: healthcheck `/health` (timeout 300s), restart ON_FAILURE.
 - Un changement de variables redéploie automatiquement le service.
+- **Attention** : contrairement à Duelpion, l’API Odfinex n’est pas toujours branchée en auto-deploy
+  git fiable. Après un merge wallet important, smoke-tester les nouvelles routes (401 vs 404) et,
+  si besoin, `railway up --service odfinex-api` depuis `main` local.
 
 ## Variables d'environnement (production)
 
@@ -102,10 +105,12 @@ main          →  production (CI + deploys Vercel)
 | `BAZIK_USER_ID` | Même compte que Ludolakay |
 | `BAZIK_SECRET_KEY` | Même compte que Ludolakay |
 | `BAZIK_WEBHOOK_SECRET` | Même compte que Ludolakay (signature HMAC) |
+| `ODFINEX_NOTIFY_SECRET` | Secret partagé HMAC pour notifier les jeux (wallet-events) |
+| `DUELPION_NOTIFY_URL` | Base URL serveur Duelpion (ex. `https://duelpion-production.up.railway.app`) — ou `game_client.notify_url` en DB |
 
 > MonCash : le `webhookUrl` est envoyé **par requête** à `createPayment` (pas dans le dashboard Bazik).
-> Au boot, `Dockerfile.api` exécute `db:migrate` puis démarre l’API — la migration `0005_moncash`
-> s’applique automatiquement au prochain deploy.
+> Au boot, `Dockerfile.api` exécute `db:migrate` puis démarre l’API — migrations `0005_moncash` et
+> `0006_manual_rails` s’appliquent automatiquement.
 
 ### Checklist deploy MonCash (P3)
 
@@ -114,6 +119,18 @@ main          →  production (CI + deploys Vercel)
 3. Deploy Railway vert + `/health` OK.
 4. Deploy Vercel `odfinex-web` (page `/wallet` dépôt/retrait).
 5. Smoke : login Google → `/wallet` → dépôt sandbox → solde ↑ → Duelpion mise VS IA.
+
+### Checklist NatCash + files retrait (P3d)
+
+1. Code mergé sur `main` (PR #1) — migration `0006`, SDK `0.1.6`.
+2. Vars `ODFINEX_NOTIFY_SECRET` (+ `DUELPION_NOTIFY_URL` ou `notify_url` en DB sur `duelpion.*`).
+3. Deploy Railway **avec le code à jour** : si après merge les routes
+   `/v1/admin/payment-rails`, `/v1/admin/deposit-requests`, `/v1/wallet/payment-rails` répondent **404**,
+   faire `railway up --service odfinex-api` depuis le monorepo sur `main` (un `redeploy --from-source`
+   peut reconstruire une archive obsolète). Attendu sans auth : **401**, pas 404.
+4. Admin Vercel : pages `/payment-rails`, `/deposit-requests`, `/withdrawal-requests`.
+5. Config NatCash (live + sandbox) via admin ou SQL : compte, min/max, `enabled`.
+6. Smoke : dépôt NatCash (preuve ou réf) → approve admin → crédit + webhook Duelpion ; retrait hold → approve/reject.
 
 ### Vercel (web/admin/play, targets production + preview)
 
