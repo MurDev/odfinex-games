@@ -278,6 +278,30 @@ s2s.post("/wallet/credit-user", requireS2SClientAuth, async (c) => {
   });
 });
 
+/** S2S read-only balance for a platform user. */
+s2s.get("/client/balance", requireS2SClientAuth, async (c) => {
+  const environment = c.get("environment");
+  const userId = c.req.query("userId");
+
+  if (!userId) {
+    return apiError(c, 400, "MISSING_USER_ID", "userId query parameter is required");
+  }
+
+  const target = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!target) {
+    return apiError(c, 404, "USER_NOT_FOUND", "userId does not exist");
+  }
+
+  const balanceCents = await getBalanceCents(userId, environment);
+  return c.json({ userId, balanceCents, currency: "HTG" as const });
+});
+
 /**
  * Game-admin ledger (S2S): rows for this clientId, plus platform
  * deposits/withdrawals for users who already interacted with this client.

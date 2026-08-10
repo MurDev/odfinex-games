@@ -67,6 +67,7 @@ app.get("/", (c) =>
       "POST /v1/wallet/withdraw",
       "GET /v1/wallet/transactions",
       "GET /v1/client/transactions",
+      "GET /v1/client/balance",
       "POST /v1/wallet/grant",
       "POST /webhooks/bazik",
       "GET /v1/admin/stats",
