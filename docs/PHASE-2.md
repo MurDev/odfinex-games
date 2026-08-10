@@ -88,5 +88,6 @@ pnpm --filter @odfinex/play dev
 - [x] HMAC S2S sur credit (aligné debit)
 - [x] MonCash dépôts / retraits (Bazik)
 - [x] `POST /v1/wallet/credit-user` pour commissions hors-session
+- [x] NatCash dépôts manuels + file de retraits MonCash/NatCash (admin Odfinex valide ; S2S list jeux ; notify webhook) — SDK `0.1.6`
 
-Voir aussi : [`SDK-INTEGRATION.md`](./SDK-INTEGRATION.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`SECURITY-PHASE-2.md`](./SECURITY-PHASE-2.md), [`S2S-AUTH.md`](./S2S-AUTH.md).
+Voir aussi : [`SDK-INTEGRATION.md`](./SDK-INTEGRATION.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`SECURITY-PHASE-2.md`](./SECURITY-PHASE-2.md), [`S2S-AUTH.md`](./S2S-AUTH.md), [`ROADMAP.md`](./ROADMAP.md).

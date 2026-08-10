@@ -7,10 +7,20 @@ import { gameClients } from "./schema.js";
 const db = createDb(requireDatabaseUrl());
 const sql = db.$client;
 
-/** Well-known test secret for the platform's own sandbox demo (play /sandbox). */
+/** Well-known test secret for sandbox game clients (shared across games in sandbox). */
 export const SANDBOX_SECRET = "sandbox_test_secret_change_me";
 
-const sandboxGame = {
+type SeedGame = {
+  slug: string;
+  name: string;
+  hidden: boolean;
+  launchUrl: string;
+  redirectUrls: string[];
+  walletEnabled: boolean;
+  notifyUrl?: string;
+};
+
+const sandboxGame: SeedGame = {
   slug: "sandbox",
   name: "Sandbox",
   hidden: true,
@@ -26,7 +36,7 @@ const sandboxGame = {
   walletEnabled: true,
 };
 
-const duelpionGame = {
+const duelpionGame: SeedGame = {
   slug: "duelpion",
   name: "DUELPION",
   hidden: false,
@@ -44,11 +54,28 @@ const duelpionGame = {
   walletEnabled: true,
 };
 
+const dominotacticsGame: SeedGame = {
+  slug: "dominotactics",
+  name: "Domino Tactics",
+  hidden: false,
+  launchUrl: "http://localhost:3015",
+  redirectUrls: [
+    "http://localhost:3015",
+    "http://localhost:3015/",
+    "http://127.0.0.1:3015",
+    "https://dominotactics-web.vercel.app",
+    "https://dominotactics-web.vercel.app/",
+  ],
+  walletEnabled: true,
+  notifyUrl:
+    "https://dominotactics-server-production.up.railway.app/webhooks/odfinex/wallet-events",
+};
+
 function hash(secret: string): string {
   return createHash("sha256").update(secret).digest("hex");
 }
 
-for (const game of [sandboxGame, duelpionGame]) {
+for (const game of [sandboxGame, duelpionGame, dominotacticsGame]) {
   for (const environment of ["sandbox", "live"] as const) {
     const clientId = `${game.slug}.${environment}`;
     const clientSecretHash =
@@ -65,6 +92,7 @@ for (const game of [sandboxGame, duelpionGame]) {
         redirectUrls: game.redirectUrls,
         walletEnabled: game.walletEnabled,
         clientSecretHash,
+        notifyUrl: game.notifyUrl,
       })
       .onConflictDoUpdate({
         target: gameClients.clientId,
@@ -76,6 +104,7 @@ for (const game of [sandboxGame, duelpionGame]) {
           redirectUrls: game.redirectUrls,
           isActive: true,
           walletEnabled: game.walletEnabled,
+          notifyUrl: game.notifyUrl,
         },
       });
 

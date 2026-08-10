@@ -47,6 +47,26 @@ async function requireAdmin(c: Parameters<typeof requirePlatformSession>[0], nex
   await next();
 }
 
+/** Block an admin from reviewing their own request unless allowSelfReview is enabled. */
+async function assertNotSelf(c: Parameters<typeof requirePlatformSession>[0], targetUserId: string) {
+  const admin = c.get("user");
+  if (admin.id !== targetUserId) return null;
+  const [dbUser] = await db
+    .select({ allowSelfReview: users.allowSelfReview })
+    .from(users)
+    .where(eq(users.id, admin.id))
+    .limit(1);
+  if (!dbUser?.allowSelfReview) {
+    return apiError(
+      c,
+      403,
+      "SELF_ACTION",
+      "You cannot review your own request. Ask another admin, or enable allow_self_review for your account.",
+    );
+  }
+  return null;
+}
+
 /* ── Stats ── */
 
 adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) => {
@@ -542,6 +562,7 @@ adminRoutes.patch("/admin/payment-rails/:id", requirePlatformSession, requireAdm
 /* ── Manual deposit requests ── */
 
 adminRoutes.get("/admin/deposit-requests", requirePlatformSession, requireAdmin, async (c) => {
+  const admin = c.get("user");
   const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 100);
   const offset = Number(c.req.query("offset") ?? 0) || 0;
   const status = c.req.query("status");
@@ -580,6 +601,7 @@ adminRoutes.get("/admin/deposit-requests", requirePlatformSession, requireAdmin,
   return c.json({
     items: items.map((r) => ({
       ...r,
+      isSelf: r.userId === admin.id,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     })),
@@ -605,6 +627,9 @@ adminRoutes.post(
     if (row.status !== "pending") {
       return apiError(c, 409, "NOT_PENDING", "Request is not pending");
     }
+
+    const selfError = await assertNotSelf(c, row.userId);
+    if (selfError) return selfError;
 
     const credit = await applyLedgerMutation({
       userId: row.userId,
@@ -665,6 +690,9 @@ adminRoutes.post(
       return apiError(c, 409, "NOT_PENDING", "Request is not pending");
     }
 
+    const selfError = await assertNotSelf(c, row.userId);
+    if (selfError) return selfError;
+
     await db
       .update(manualDepositRequests)
       .set({
@@ -692,6 +720,7 @@ adminRoutes.post(
 /* ── Withdrawal requests ── */
 
 adminRoutes.get("/admin/withdrawal-requests", requirePlatformSession, requireAdmin, async (c) => {
+  const admin = c.get("user");
   const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 100);
   const offset = Number(c.req.query("offset") ?? 0) || 0;
   const status = c.req.query("status");
@@ -732,6 +761,7 @@ adminRoutes.get("/admin/withdrawal-requests", requirePlatformSession, requireAdm
   return c.json({
     items: items.map((r) => ({
       ...r,
+      isSelf: r.userId === admin.id,
       account: r.account || r.phone,
       createdAt: r.createdAt.toISOString(),
       completedAt: r.completedAt?.toISOString() ?? null,
@@ -758,6 +788,9 @@ adminRoutes.post(
     if (row.status !== "pending") {
       return apiError(c, 409, "NOT_PENDING", "Request is not pending");
     }
+
+    const selfError = await assertNotSelf(c, row.userId);
+    if (selfError) return selfError;
 
     const account = row.account || row.phone;
     const method = row.method || "moncash";
@@ -932,6 +965,9 @@ adminRoutes.post(
     if (row.status !== "pending") {
       return apiError(c, 409, "NOT_PENDING", "Request is not pending");
     }
+
+    const selfError = await assertNotSelf(c, row.userId);
+    if (selfError) return selfError;
 
     await applyLedgerMutation({
       userId: row.userId,

@@ -32,6 +32,7 @@
 | P3 | Paiements MonCash | ✅ | Dépôts / retraits Bazik + UI `/wallet` + webhook `/webhooks/bazik` ; mock local sans credentials |
 | P3b | Credit S2S offline | ✅ | `POST /v1/wallet/credit-user` + SDK `creditToUser` (parrainage) |
 | P3c | Credit HMAC obligatoire | ✅ | `requireClientSignature` sur debit **et** credit |
+| P3d | NatCash manuel + file retraits | ✅ | PR [#1](https://github.com/MurDev/odfinex-games/pull/1) (3 août 2026) : `payment_rail_config`, `manual_deposit_request`, withdraw queue MonCash/NatCash, admin approve, S2S list, `notifyUrl` → jeux ; SDK `@odfinex/games-sdk@0.1.6` |
 | P4 | Catalogue web riche (Phase 3) | À faire | Listes, détails jeu, profils joueurs |
 
 ## Décisions en attente
@@ -41,6 +42,9 @@
 
 ## Historique
 
+- **3 août 2026** : NatCash manuel + files dépôt/retrait dual-admin (migration `0006`, admin
+  payment-rails / deposit-requests / withdrawal-requests, webhook notify jeux, SDK `0.1.6`).
+  Deploy API : préférer `railway up` depuis `main` si `redeploy --from-source` laisse les routes en 404.
 - **31 juillet 2026** : deploiement production (Vercel + Railway + Postgres), CI vert, secrets turbo,
   URLs prod corrigées (`odfinex-web` au lieu de `odfinex-games`), login admin OK, `is_admin` activé.
 - **31 juillet 2026** : modèle 2 environnements implémenté et déployé (migration `0004`, wallet isolé,

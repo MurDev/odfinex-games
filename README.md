@@ -10,7 +10,7 @@ Un **sandbox** vit dans `apps/play` pour valider le flux launch / SDK (masqué d
 | App | URL | Rôle |
 |---|---|---|
 | web | https://odfinex-web.vercel.app | Catalogue, login Google, profil |
-| admin | https://odfinex-admin.vercel.app | Ops (jeux, joueurs, transactions) |
+| admin | https://odfinex-admin.vercel.app | Ops (jeux, joueurs, transactions, NatCash / files dépôt-retrait) |
 | play | https://odfinex-play.vercel.app | Surface sandbox (lit `?token=` depuis l'URL) |
 | API | https://odfinex-api-production.up.railway.app | Identity, launch tokens, game registry, wallet |
 
