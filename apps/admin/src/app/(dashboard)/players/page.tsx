@@ -13,19 +13,28 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ExternalLink, Search } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { PlayersSearch } from "./players-search";
+import { PlayersSearch, SORT_KEYS, type SortKey } from "./players-search";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default async function PlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; type?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    type?: string;
+    role?: string;
+    sort?: string;
+    page?: string;
+  }>;
 }) {
-  const { search, type } = await searchParams;
+  const { search, type, role, sort, page } = await searchParams;
   const typeFilter = type === "bot" ? "bot" : type === "human" ? "human" : "all";
+  const roleFilter = role === "admin" ? "admin" : role === "player" ? "player" : "all";
+  const sortKey = SORT_KEYS.includes(sort as SortKey) ? (sort as SortKey) : "date_desc";
+  const perPage = 20;
+  const currentPage = Math.max(1, Number(page) || 1);
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -37,6 +46,10 @@ export default async function PlayersPage({
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (typeFilter !== "all") params.set("type", typeFilter);
+    if (roleFilter !== "all") params.set("role", roleFilter);
+    if (sortKey !== "date_desc") params.set("sort", sortKey);
+    params.set("limit", String(perPage));
+    params.set("offset", String((currentPage - 1) * perPage));
     const qs = params.toString();
     const data = await adminServerFetch<{ players: AdminPlayer[]; total: number }>(
       `/admin/players${qs ? `?${qs}` : ""}`,
@@ -64,7 +77,15 @@ export default async function PlayersPage({
         </p>
       </div>
 
-      <PlayersSearch defaultValue={search ?? ""} type={typeFilter} />
+      <PlayersSearch
+        defaultValue={search ?? ""}
+        type={typeFilter}
+        role={roleFilter}
+        sort={sortKey}
+        page={currentPage}
+        total={total}
+        perPage={perPage}
+      />
 
       <Card>
         <CardContent className="p-0">

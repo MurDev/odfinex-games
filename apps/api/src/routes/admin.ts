@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { AdminUserCreateSchema, AdminUserCreditSchema } from "@odfinex/shared";
 import {
@@ -316,68 +316,88 @@ adminRoutes.post("/admin/games", requirePlatformSession, requireAdmin, async (c)
 adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c) => {
   const search = c.req.query("search")?.trim() ?? "";
   const typeFilter = c.req.query("type"); // human | bot
+  const roleFilter = c.req.query("role"); // admin | player
+  const sort = c.req.query("sort") ?? "date_desc";
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
   const offset = Number(c.req.query("offset") ?? 0) || 0;
 
   let conditions = undefined;
   if (search) {
-    conditions = sql`(${users.email} ilike ${`%${search}%`} or ${users.name} ilike ${`%${search}%`})`;
+    conditions = or(ilike(users.email, `%${search}%`), ilike(users.name, `%${search}%`));
   }
   if (typeFilter === "bot") {
-    conditions = and(conditions, sql`is_bot = true`);
+    conditions = and(conditions, eq(users.isBot, true));
   } else if (typeFilter === "human") {
-    conditions = and(conditions, sql`is_bot = false`);
+    conditions = and(conditions, eq(users.isBot, false));
+  }
+  if (roleFilter === "admin") {
+    conditions = and(conditions, eq(users.isAdmin, true));
+  } else if (roleFilter === "player") {
+    conditions = and(conditions, eq(users.isAdmin, false));
   }
 
-  const allUsers = await db
-    .select()
+  const liveBalance = db
+    .select({ balance: walletAccounts.balanceCents })
+    .from(walletAccounts)
+    .where(and(eq(walletAccounts.userId, users.id), eq(walletAccounts.environment, "live")))
+    .limit(1);
+
+  const balanceCents = sql<number>`${liveBalance}`;
+  const transactionCount = db.$count(ledgerEntries, eq(ledgerEntries.userId, users.id));
+
+  const orderBy: SQL =
+    sort === "date_asc"
+      ? asc(users.createdAt)
+      : sort === "balance_desc"
+        ? desc(balanceCents)
+        : sort === "balance_asc"
+          ? asc(balanceCents)
+          : sort === "transactions_desc"
+            ? desc(transactionCount)
+            : sort === "transactions_asc"
+              ? asc(transactionCount)
+              : sort === "name_asc"
+                ? asc(users.name)
+                : sort === "name_desc"
+                  ? desc(users.name)
+                  : desc(users.createdAt);
+
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      image: users.image,
+      isAdmin: users.isAdmin,
+      isBot: users.isBot,
+      createdAt: users.createdAt,
+      balanceCents,
+      transactionCount,
+    })
     .from(users)
     .where(conditions)
-    .orderBy(desc(users.createdAt))
+    .orderBy(orderBy)
     .limit(limit)
     .offset(offset);
 
   const [totalRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
+    .select({ count: count() })
     .from(users)
     .where(conditions);
 
-  const playersWithWallet = await Promise.all(
-    allUsers.map(async (u) => {
-      const walletRows = await db
-        .select({
-          balance: walletAccounts.balanceCents,
-          environment: walletAccounts.environment,
-        })
-        .from(walletAccounts)
-        .where(eq(walletAccounts.userId, u.id));
+  const players = rows.map((u) => ({
+    id: u.id,
+    displayName: u.name,
+    email: u.email,
+    avatarUrl: u.image,
+    isAdmin: u.isAdmin,
+    isBot: u.isBot,
+    createdAt: u.createdAt.toISOString(),
+    balanceCents: u.balanceCents ?? 0,
+    transactionCount: u.transactionCount ?? 0,
+  }));
 
-      const live =
-        walletRows.find((r) => r.environment === "live")?.balance ?? 0;
-      const sandbox =
-        walletRows.find((r) => r.environment === "sandbox")?.balance ?? 0;
-
-      const [txCount] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(ledgerEntries)
-        .where(eq(ledgerEntries.userId, u.id));
-
-      return {
-        id: u.id,
-        displayName: u.name,
-        email: u.email,
-        avatarUrl: u.image,
-        isAdmin: u.isAdmin ?? false,
-        isBot: u.isBot ?? false,
-        createdAt: u.createdAt.toISOString(),
-        balanceCents: live,
-        sandboxBalanceCents: sandbox,
-        transactionCount: txCount?.count ?? 0,
-      };
-    }),
-  );
-
-  return c.json({ players: playersWithWallet, total: totalRow?.count ?? 0 });
+  return c.json({ players, total: totalRow?.count ?? 0 });
 });
 
 adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, async (c) => {
