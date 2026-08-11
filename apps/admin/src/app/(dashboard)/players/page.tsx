@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { PlayersSearch, SORT_KEYS, type SortKey } from "./players-search";
+import { PlayersSearch } from "./players-search";
+import { SORT_KEYS, type SortKey } from "./constants";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default async function PlayersPage({
