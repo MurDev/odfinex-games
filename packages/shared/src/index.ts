@@ -262,6 +262,8 @@ export const AdminStatsSchema = z.object({
   totalTransactions: z.number().int().nonnegative(),
   totalWalletBalance: z.number().int().nonnegative(),
   totalVolumeCents: z.number().int().nonnegative(),
+  pendingDeposits: z.number().int().nonnegative(),
+  pendingWithdrawals: z.number().int().nonnegative(),
 });
 
 export type AdminStats = z.infer<typeof AdminStatsSchema>;
@@ -289,6 +291,7 @@ export const AdminGameUpdateSchema = z.object({
   redirectUrls: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
   walletEnabled: z.boolean().optional(),
+  hidden: z.boolean().optional(),
   notifyUrl: z.string().url().nullable().optional(),
 });
 
@@ -353,6 +356,27 @@ export const AdminUserCreditSchema = z.object({
 });
 
 export type AdminUserCredit = z.infer<typeof AdminUserCreditSchema>;
+
+/** Same shape as credit; the endpoint applies a ledger debit instead. */
+export const AdminUserDebitSchema = AdminUserCreditSchema;
+
+export type AdminUserDebit = z.infer<typeof AdminUserDebitSchema>;
+
+/** Provisioned account (bot or game operator) for the /admin/accounts list. */
+export const AdminAccountSchema = z.object({
+  id: z.string(),
+  displayName: z.string().nullable(),
+  email: z.string().email().nullable(),
+  isBot: z.boolean(),
+  isAdmin: z.boolean(),
+  clientId: z.string().nullable(),
+  gameName: z.string().nullable(),
+  balanceCents: z.number().int().nonnegative(),
+  transactionCount: z.number().int().nonnegative(),
+  createdAt: z.string(),
+});
+
+export type AdminAccount = z.infer<typeof AdminAccountSchema>;
 
 /** Bulk S2S wallet balances for a list of platform users (e.g. game bots). */
 export const ClientBalancesRequestSchema = z.object({

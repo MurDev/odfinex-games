@@ -9,7 +9,16 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  let stats: AdminStats = { totalUsers: 0, totalBots: 0, totalGames: 0, totalTransactions: 0, totalWalletBalance: 0, totalVolumeCents: 0 };
+  let stats: AdminStats = {
+    totalUsers: 0,
+    totalBots: 0,
+    totalGames: 0,
+    totalTransactions: 0,
+    totalWalletBalance: 0,
+    totalVolumeCents: 0,
+    pendingDeposits: 0,
+    pendingWithdrawals: 0,
+  };
   let error: string | null = null;
 
   try {

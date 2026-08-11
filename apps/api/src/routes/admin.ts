@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { AdminUserCreateSchema, AdminUserCreditSchema } from "@odfinex/shared";
+import { AdminUserCreateSchema, AdminUserCreditSchema, AdminUserDebitSchema } from "@odfinex/shared";
 import {
   gameClients,
   ledgerEntries,
@@ -88,6 +88,14 @@ adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) 
   const [volumeRow] = await db
     .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
     .from(ledgerEntries);
+  const [pendingDeposits] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(manualDepositRequests)
+    .where(eq(manualDepositRequests.status, "pending"));
+  const [pendingWithdrawals] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(withdrawalRequests)
+    .where(eq(withdrawalRequests.status, "pending"));
 
   return c.json({
     totalUsers: userCount?.count ?? 0,
@@ -96,6 +104,8 @@ adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) 
     totalTransactions: txCount?.count ?? 0,
     totalWalletBalance: walletRow?.total ?? 0,
     totalVolumeCents: volumeRow?.total ?? 0,
+    pendingDeposits: pendingDeposits?.count ?? 0,
+    pendingWithdrawals: pendingWithdrawals?.count ?? 0,
   });
 });
 
@@ -465,6 +475,75 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
 
 /* ── Users (admin provisioning: bots, operator accounts) ── */
 
+adminRoutes.get("/admin/accounts", requirePlatformSession, requireAdmin, async (c) => {
+  const search = c.req.query("search")?.trim() ?? "";
+  const game = c.req.query("game");
+  const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
+  const offset = Number(c.req.query("offset") ?? 0) || 0;
+
+  let conditions = or(eq(users.isBot, true), isNotNull(users.clientId));
+  if (search) {
+    conditions = and(conditions, or(ilike(users.email, `%${search}%`), ilike(users.name, `%${search}%`)));
+  }
+  if (game) {
+    conditions = and(conditions, eq(users.clientId, game));
+  }
+
+  const liveBalance = db
+    .select({ balance: walletAccounts.balanceCents })
+    .from(walletAccounts)
+    .where(and(eq(walletAccounts.userId, users.id), eq(walletAccounts.environment, "live")))
+    .limit(1);
+  const balanceCents = sql<number>`${liveBalance}`;
+  const transactionCount = db.$count(ledgerEntries, eq(ledgerEntries.userId, users.id));
+  const ownerGame = db
+    .select({ name: gameClients.name })
+    .from(gameClients)
+    .where(eq(gameClients.clientId, users.clientId))
+    .limit(1);
+  const gameName = sql<string>`${ownerGame}`;
+
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      isBot: users.isBot,
+      isAdmin: users.isAdmin,
+      clientId: users.clientId,
+      createdAt: users.createdAt,
+      balanceCents,
+      transactionCount,
+      gameName,
+    })
+    .from(users)
+    .where(conditions)
+    .orderBy(desc(users.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  const [totalRow] = await db
+    .select({ count: count() })
+    .from(users)
+    .where(conditions);
+
+  return c.json({
+    accounts: rows.map((u) => ({
+      id: u.id,
+      displayName: u.name,
+      email: u.email,
+      isBot: u.isBot,
+      isAdmin: u.isAdmin,
+      clientId: u.clientId,
+      gameName: u.gameName ?? null,
+      balanceCents: u.balanceCents ?? 0,
+      transactionCount: u.transactionCount ?? 0,
+      createdAt: u.createdAt.toISOString(),
+    })),
+    total: totalRow?.count ?? 0,
+  });
+});
+
 adminRoutes.post("/admin/users", requirePlatformSession, requireAdmin, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = AdminUserCreateSchema.safeParse(body);
@@ -575,6 +654,50 @@ adminRoutes.post("/admin/users/:id/credit", requirePlatformSession, requireAdmin
   });
 });
 
+adminRoutes.post("/admin/users/:id/debit", requirePlatformSession, requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const target = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!target) {
+    return apiError(c, 404, "USER_NOT_FOUND", "User not found");
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = AdminUserDebitSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "amountCents (positive int) is required");
+  }
+
+  const referenceId =
+    parsed.data.referenceId ?? `admin_debit_${id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const result = await applyLedgerMutation({
+    userId: id,
+    clientId: "platform",
+    environment: "live",
+    type: "debit",
+    amountCents: parsed.data.amountCents,
+    reason: parsed.data.reason ?? "admin_investment",
+    referenceId,
+  });
+
+  if (!result.ok) {
+    return apiError(c, 409, result.code, result.message);
+  }
+
+  return c.json({
+    txId: result.txId,
+    balanceCents: result.balanceCents,
+    currency: "HTG" as const,
+    replay: result.replay,
+  });
+});
+
 /* ── Transactions ── */
 
 adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, async (c) => {
@@ -604,19 +727,33 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
     .limit(limit)
     .offset(offset);
 
+  const userIds = [...new Set(items.map((tx) => tx.userId))];
+  const userRows = userIds.length
+    ? await db
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(inArray(users.id, userIds))
+    : [];
+  const userById = new Map(userRows.map((u) => [u.id, u]));
+
   return c.json({
-    items: items.map((tx) => ({
-      id: tx.id,
-      userId: tx.userId,
-      type: tx.type,
-      amountCents: tx.amountCents,
-      balanceAfterCents: tx.balanceAfterCents,
-      reason: tx.reason,
-      clientId: tx.clientId,
-      environment: tx.environment as WalletEnvironment,
-      referenceId: tx.referenceId,
-      createdAt: tx.createdAt.toISOString(),
-    })),
+    items: items.map((tx) => {
+      const player = userById.get(tx.userId);
+      return {
+        id: tx.id,
+        userId: tx.userId,
+        type: tx.type,
+        amountCents: tx.amountCents,
+        balanceAfterCents: tx.balanceAfterCents,
+        reason: tx.reason,
+        clientId: tx.clientId,
+        environment: tx.environment as WalletEnvironment,
+        referenceId: tx.referenceId,
+        createdAt: tx.createdAt.toISOString(),
+        displayName: player?.name ?? null,
+        email: player?.email ?? null,
+      };
+    }),
     total: totalRow?.count ?? 0,
   });
 });

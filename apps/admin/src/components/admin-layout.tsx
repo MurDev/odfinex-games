@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Gamepad2,
   Users,
+  Bot,
   ArrowLeftRight,
   Menu,
   X,
@@ -35,14 +36,39 @@ type NavItem = {
   icon: React.ElementType;
 };
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Jeux", href: "/games", icon: Gamepad2 },
-  { label: "Joueurs", href: "/players", icon: Users },
-  { label: "Transactions", href: "/transactions", icon: ArrowLeftRight },
-  { label: "Payment rails", href: "/payment-rails", icon: Landmark },
-  { label: "Depots NatCash", href: "/deposit-requests", icon: Inbox },
-  { label: "Retraits", href: "/withdrawal-requests", icon: Banknote },
+type NavSection = {
+  title: string;
+  items: NavItem[];
+};
+
+const navSections: NavSection[] = [
+  {
+    title: "General",
+    items: [{ label: "Dashboard", href: "/", icon: LayoutDashboard }],
+  },
+  {
+    title: "Jeux",
+    items: [{ label: "Jeux", href: "/games", icon: Gamepad2 }],
+  },
+  {
+    title: "Comptes",
+    items: [
+      { label: "Joueurs", href: "/players", icon: Users },
+      { label: "Comptes & Bots", href: "/accounts", icon: Bot },
+    ],
+  },
+  {
+    title: "Activite",
+    items: [{ label: "Transactions", href: "/transactions", icon: ArrowLeftRight }],
+  },
+  {
+    title: "Finance",
+    items: [
+      { label: "Payment rails", href: "/payment-rails", icon: Landmark },
+      { label: "Depots NatCash", href: "/deposit-requests", icon: Inbox },
+      { label: "Retraits", href: "/withdrawal-requests", icon: Banknote },
+    ],
+  },
 ];
 
 type AdminLayoutProps = {
@@ -86,25 +112,36 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
         </div>
 
         <ScrollArea className="flex-1 px-2 py-3">
-          <nav className="flex flex-col gap-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  {sidebarOpen && <span>{item.label}</span>}
-                </Link>
-              );
-            })}
+          <nav className="flex flex-col gap-4">
+            {navSections.map((section) => (
+              <div key={section.title} className="flex flex-col gap-1">
+                {sidebarOpen && (
+                  <p className="px-3 pb-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    {section.title}
+                  </p>
+                )}
+                {section.items.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== "/" && pathname.startsWith(item.href));
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        isActive
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      )}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {sidebarOpen && <span>{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
         </ScrollArea>
       </aside>
