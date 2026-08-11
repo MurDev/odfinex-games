@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { GamesListResponseSchema, type GameClient } from "@odfinex/shared";
 
 const apiUrl = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(
@@ -5,10 +6,26 @@ const apiUrl = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http:
   "",
 );
 
-const GAME_COPY: Record<string, { blurb: string; accent: string }> = {
+const GAME_COPY: Record<
+  string,
+  {
+    blurb: string;
+    accent: string;
+    glow: string;
+    category: string;
+    players: string;
+    pace: string;
+    badge: string;
+  }
+> = {
   "duelpion.live": {
-    blurb: "Morpion & Gomoku — duels de pions élégants",
-    accent: "#14b8a6",
+    blurb: "Duels de pions rapides avec une lecture tactique claire, entre Morpion et Gomoku.",
+    accent: "#16d7ff",
+    glow: "#1746ff",
+    category: "Stratégie",
+    players: "1v1",
+    pace: "Rapide",
+    badge: "Hot pick",
   },
 };
 
@@ -45,73 +62,174 @@ function sortGames(games: GameClient[]): GameClient[] {
 
 export default async function HomePage() {
   const games = sortGames(await loadGames());
+  const activeCount = games.length;
 
   return (
-    <main
-      style={{
-        maxWidth: 720,
-        margin: "0 auto",
-        padding: "4rem 1.5rem",
-      }}
-    >
-      <p style={{ letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.7 }}>
-        Odfinex Games
-      </p>
-      <h1 style={{ fontSize: "2.5rem", lineHeight: 1.15, margin: "0.5rem 0 1rem" }}>
-        Catalogue
-      </h1>
-      <p style={{ opacity: 0.85, maxWidth: 480, fontSize: "1.05rem" }}>
-        Site principal — jeux, compte et wallet. Choisir un jeu lance la connexion
-        et redirige vers le jeu avec un token sécurisé.
-      </p>
+    <main className="landing">
+      <section className="portal-hero" aria-labelledby="hero-title">
+        <div className="portal-copy">
+          <p className="eyebrow">Plateforme de jeux</p>
+          <h1 id="hero-title">Odfinex Games</h1>
+          <p className="hero__copy">
+            Un portail de jeux rapide, colore et connecte au meme compte joueur.
+            Choisis une tuile, lance la session et retrouve ton wallet dans le meme hub.
+          </p>
+          <div className="hero__actions">
+            <Link className="button button--primary" href="#catalogue">
+              Explorer les jeux
+            </Link>
+            <Link className="button button--ghost" href="/wallet">
+              Wallet
+            </Link>
+          </div>
 
-      <section
-        style={{
-          marginTop: "2.5rem",
-          display: "grid",
-          gap: "1rem",
-        }}
-      >
+          <div className="portal-status" aria-label="Informations plateforme">
+            <div>
+              <strong>{activeCount}</strong>
+              <span>jeu{activeCount > 1 ? "x" : ""} live</span>
+            </div>
+            <div>
+              <strong>1</strong>
+              <span>compte</span>
+            </div>
+            <div>
+              <strong>HTG</strong>
+              <span>wallet</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="portal-stage" aria-label="Hub de jeux">
+          <div className="portal-stage__halo" aria-hidden="true" />
+          <div className="portal-stage__rail" aria-hidden="true" />
+
+          {games.map((game) => {
+            const copy = GAME_COPY[game.clientId] ?? {
+              blurb: "Jeu connecte a Odfinex Games avec authentification et wallet unifies.",
+              accent: "#ffd43b",
+              glow: "#7c5cff",
+              category: "Arcade",
+              players: "Multi",
+              pace: "Standard",
+              badge: "Nouveau",
+            };
+            return (
+              <a
+                key={game.clientId}
+                href={`/launch/${encodeURIComponent(game.clientId)}`}
+                className="portal-game portal-game--primary"
+                style={{ "--accent": copy.accent, "--glow": copy.glow } as React.CSSProperties}
+              >
+                <span className="portal-game__top">
+                  <span className="pill pill--live">Disponible</span>
+                  <span>{copy.badge}</span>
+                </span>
+                <span className="portal-game__arena" aria-hidden="true">
+                  <span className="portal-game__grid" />
+                  <span className="portal-game__token portal-game__token--a">X</span>
+                  <span className="portal-game__token portal-game__token--b">O</span>
+                  <span className="portal-game__token portal-game__token--c" />
+                </span>
+                <span>
+                  <strong>{game.name}</strong>
+                  <small>{copy.category} · {copy.players} · {copy.pace}</small>
+                  <span>{copy.blurb}</span>
+                </span>
+              </a>
+            );
+          })}
+
+          <Link className="portal-module portal-module--wallet" href="/wallet">
+            <span className="portal-module__icon">HTG</span>
+            <strong>Wallet</strong>
+            <span>Solde, depots et retraits</span>
+          </Link>
+
+          <Link className="portal-module portal-module--account" href="/me">
+            <span className="portal-module__icon">ID</span>
+            <strong>Compte joueur</strong>
+            <span>Profil unique pour tous les jeux</span>
+          </Link>
+
+          <div className="portal-module portal-module--soon">
+            <span className="portal-module__icon">+</span>
+            <strong>Next game</strong>
+            <span>Nouvelles tuiles a venir</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="catalogue" aria-labelledby="catalogue-title">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Catalogue</p>
+            <h2 id="catalogue-title">Jeux disponibles</h2>
+          </div>
+          <p>
+            Chaque card presente le style de jeu, le rythme et le statut, pour
+            permettre au joueur de choisir rapidement ou reprendre son parcours.
+          </p>
+        </div>
+
+        <div className="games-grid">
         {games.map((game) => {
           const copy = GAME_COPY[game.clientId] ?? {
-            blurb: game.launchUrl,
-            accent: "#a3a3a3",
+            blurb: "Jeu connecte a Odfinex Games avec authentification et wallet unifies.",
+            accent: "#ffd43b",
+            glow: "#7c5cff",
+            category: "Arcade",
+            players: "Multi",
+            pace: "Standard",
+            badge: "Nouveau",
           };
           return (
             <a
               key={game.clientId}
               href={`/launch/${encodeURIComponent(game.clientId)}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "1rem",
-                padding: "1.15rem 1.35rem",
-                borderRadius: 14,
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderLeft: `4px solid ${copy.accent}`,
-                color: "#e8eef3",
-                textDecoration: "none",
-                transition: "background 0.15s ease, transform 0.15s ease",
-              }}
+              className="game-card"
+              style={{ "--accent": copy.accent, "--glow": copy.glow } as React.CSSProperties}
             >
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <strong style={{ display: "block", fontSize: "1.1rem" }}>{game.name}</strong>
-                <span style={{ opacity: 0.65, fontSize: "0.9rem" }}>{copy.blurb}</span>
+              <span className="game-card__art">
+                <span className="game-card__badge">{copy.badge}</span>
+                <span className="game-card__board" />
+                <span className="game-card__chip" />
+                <span className="game-card__chip" />
+                <span className="game-card__spark" />
               </span>
-              <span
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  opacity: 0.85,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Jouer →
+              <span className="game-card__body">
+                <span className="game-card__meta">
+                  <span className="pill">{copy.category}</span>
+                  <span className="pill pill--live">Disponible</span>
+                </span>
+                <span>
+                  <h3>{game.name}</h3>
+                  <p>{copy.blurb}</p>
+                </span>
+                <span className="game-card__footer">
+                  <span className="pill">{copy.players}</span>
+                  <span className="pill">{copy.pace}</span>
+                  <span className="game-card__cta">Jouer</span>
+                </span>
               </span>
             </a>
           );
         })}
+        </div>
+      </section>
+
+      <section className="platform-band" aria-label="Fonctionnalites plateforme">
+        <div className="platform-feature">
+          <strong>Compte unique</strong>
+          <p>Connexion Google et retour automatique vers le jeu selectionne.</p>
+        </div>
+        <div className="platform-feature">
+          <strong>Wallet integre</strong>
+          <p>Solde visible dans l&apos;en-tete et acces direct aux operations.</p>
+        </div>
+        <div className="platform-feature">
+          <strong>Catalogue evolutif</strong>
+          <p>Les jeux actifs remontent depuis l&apos;API avec un fallback local.</p>
+        </div>
       </section>
     </main>
   );

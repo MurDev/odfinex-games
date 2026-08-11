@@ -34,78 +34,40 @@ export default async function Header() {
   }
 
   return (
-    <header
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "1rem 2rem",
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
-        position: "sticky",
-        top: 0,
-        background: "rgba(7,11,16,0.85)",
-        backdropFilter: "blur(12px)",
-        zIndex: 10,
-      }}
-    >
-      <Link
-        href="/"
-        style={{ fontWeight: 700, letterSpacing: "0.05em", color: "#e8eef3", textDecoration: "none" }}
-      >
-        Odfinex Games
-      </Link>
+    <header className="site-header">
+      <div className="site-header__inner">
+        <Link href="/" className="brand-link">
+          <span className="brand-link__mark">OG</span>
+          <span className="brand-link__text">Odfinex Games</span>
+        </Link>
 
-      <nav style={{ display: "flex", alignItems: "center", gap: "1.25rem", fontSize: "0.9rem" }}>
-        {user ? (
-          <>
-            {balanceLabel && (
-              <a
-                href="/wallet"
-                style={{
-                  ...navLink,
-                  background: "rgba(20,184,166,0.15)",
-                  border: "1px solid rgba(20,184,166,0.35)",
-                  padding: "0.35rem 0.75rem",
-                  borderRadius: 8,
-                  fontWeight: 600,
-                }}
-              >
-                {balanceLabel}
+        <nav className="site-nav" aria-label="Navigation principale">
+          {user ? (
+            <>
+              {balanceLabel && (
+                <a href="/wallet" className="nav-link nav-link--wallet">
+                  {balanceLabel}
+                </a>
+              )}
+              <a href="/wallet" className="nav-link">
+                Wallet
               </a>
-            )}
-            <a href="/wallet" style={navLink}>
-              Wallet
-            </a>
-            <a href="/me" style={navLink}>
-              {user.name ?? user.email}
-            </a>
-          </>
-        ) : (
-          <>
-            <a href="/login" style={navLink}>
-              Connexion
-            </a>
-            <a
-              href="/login"
-              style={{
-                ...navLink,
-                background: "#2563eb",
-                padding: "0.4rem 0.9rem",
-                borderRadius: 7,
-                color: "#fff",
-              }}
-            >
-              Continuer avec Google
-            </a>
-          </>
-        )}
-      </nav>
+              <a href="/me" className="nav-link">
+                {user.name ?? user.email}
+              </a>
+            </>
+          ) : (
+            <>
+              <a href="/login" className="nav-link">
+                Connexion
+              </a>
+              <a href="/login" className="nav-link nav-link--primary">
+                Continuer avec Google
+              </a>
+            </>
+          )}
+        </nav>
+      </div>
     </header>
   );
 }
-
-const navLink: React.CSSProperties = {
-  color: "#e8eef3",
-  textDecoration: "none",
-  opacity: 0.85,
-};
