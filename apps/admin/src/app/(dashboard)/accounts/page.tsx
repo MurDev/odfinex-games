@@ -17,7 +17,7 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { AccountsSearch } from "./accounts-search";
 import { CreateAccountDialog } from "./create-account-dialog";
-import { CreditDebitDialog } from "./credit-debit-dialog";
+import { CreditDebitDialog } from "@/components/credit-debit-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const PER_PAGE = 20;
@@ -132,8 +132,20 @@ export default async function AccountsPage({
                     <TableCell>{account.transactionCount}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <CreditDebitDialog account={account} direction="credit" />
-                        <CreditDebitDialog account={account} direction="debit" />
+                        <CreditDebitDialog
+                          userId={account.id}
+                          displayName={account.displayName}
+                          email={account.email}
+                          balanceCents={account.balanceCents}
+                          direction="credit"
+                        />
+                        <CreditDebitDialog
+                          userId={account.id}
+                          displayName={account.displayName}
+                          email={account.email}
+                          balanceCents={account.balanceCents}
+                          direction="debit"
+                        />
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/players/${account.id}`}>
                             <ExternalLink className="mr-1 h-3 w-3" />

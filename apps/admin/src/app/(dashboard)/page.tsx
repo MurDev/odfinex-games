@@ -3,7 +3,19 @@ import { adminServerFetch } from "@/lib/server-fetch";
 import { formatHtg } from "@/lib/api";
 import type { AdminStats } from "@odfinex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Bot, Gamepad2, ArrowLeftRight, Wallet } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Users,
+  Bot,
+  Gamepad2,
+  ArrowLeftRight,
+  Wallet,
+  Inbox,
+  Banknote,
+  Landmark,
+  ChevronRight,
+} from "lucide-react";
+import Link from "next/link";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -68,15 +80,88 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">Volume total</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-primary">{formatHtg(stats.totalVolumeCents)}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Volume cumule debit + credit</p>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Link href="/deposit-requests?status=pending">
+          <Card className="transition-colors hover:bg-sidebar-accent">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Depots en attente
+              </CardTitle>
+              <Inbox className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingDeposits}</div>
+              <p className="text-xs text-muted-foreground">Demandes NatCash a valider</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/withdrawal-requests?status=pending">
+          <Card className="transition-colors hover:bg-sidebar-accent">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Retraits en attente
+              </CardTitle>
+              <Banknote className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingWithdrawals}</div>
+              <p className="text-xs text-muted-foreground">MonCash / NatCash a traiter</p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Volume total</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{formatHtg(stats.totalVolumeCents)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Volume cumule debit + credit</p>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Raccourcis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/games">
+                Jeux
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/accounts">
+                Comptes & Bots
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/players">
+                Joueurs
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/transactions">
+                Transactions
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/payment-rails">
+                <Landmark className="mr-1 h-4 w-4" />
+                Payment rails
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
