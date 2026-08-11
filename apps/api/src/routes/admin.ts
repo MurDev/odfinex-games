@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
+import { AdminUserCreateSchema, AdminUserCreditSchema } from "@odfinex/shared";
 import {
   gameClients,
   ledgerEntries,
@@ -16,9 +17,9 @@ import { db } from "../db.js";
 import { apiError } from "../lib/errors.js";
 import { toPublicUser } from "../lib/user.js";
 import type { User, WalletEnvironment } from "@odfinex/shared";
+import { applyLedgerMutation } from "../lib/wallet.js";
 import { requirePlatformSession, type AuthVariables } from "../middleware/auth.js";
 import { generateClientSecret } from "../lib/signature.js";
-import { applyLedgerMutation } from "../lib/wallet.js";
 import { notifyGameWalletEvent } from "../lib/notify-game.js";
 import {
   classifyWithdrawOutcome,
@@ -70,7 +71,12 @@ async function assertNotSelf(c: Parameters<typeof requirePlatformSession>[0], ta
 /* ── Stats ── */
 
 adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) => {
-  const [userCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users);
+  const [userCount] = await db
+    .select({ count: sql<number>`count(*) filter (where not is_bot)::int` })
+    .from(users);
+  const [botCount] = await db
+    .select({ count: sql<number>`count(*) filter (where is_bot)::int` })
+    .from(users);
   const [gameCount] = await db
     .select({ count: sql<number>`count(distinct name)::int` })
     .from(gameClients);
@@ -85,6 +91,7 @@ adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) 
 
   return c.json({
     totalUsers: userCount?.count ?? 0,
+    totalBots: botCount?.count ?? 0,
     totalGames: gameCount?.count ?? 0,
     totalTransactions: txCount?.count ?? 0,
     totalWalletBalance: walletRow?.total ?? 0,
@@ -308,12 +315,18 @@ adminRoutes.post("/admin/games", requirePlatformSession, requireAdmin, async (c)
 
 adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c) => {
   const search = c.req.query("search")?.trim() ?? "";
+  const typeFilter = c.req.query("type"); // human | bot
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
   const offset = Number(c.req.query("offset") ?? 0) || 0;
 
   let conditions = undefined;
   if (search) {
     conditions = sql`(${users.email} ilike ${`%${search}%`} or ${users.name} ilike ${`%${search}%`})`;
+  }
+  if (typeFilter === "bot") {
+    conditions = and(conditions, sql`is_bot = true`);
+  } else if (typeFilter === "human") {
+    conditions = and(conditions, sql`is_bot = false`);
   }
 
   const allUsers = await db
@@ -355,6 +368,7 @@ adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c
         email: u.email,
         avatarUrl: u.image,
         isAdmin: u.isAdmin ?? false,
+        isBot: u.isBot ?? false,
         createdAt: u.createdAt.toISOString(),
         balanceCents: live,
         sandboxBalanceCents: sandbox,
@@ -409,6 +423,7 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
       email: user.email,
       avatarUrl: user.image,
       isAdmin: user.isAdmin ?? false,
+      isBot: user.isBot ?? false,
       createdAt: user.createdAt.toISOString(),
       balanceCents: live,
       sandboxBalanceCents: sandbox,
@@ -425,6 +440,118 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
       referenceId: tx.referenceId,
       createdAt: tx.createdAt.toISOString(),
     })),
+  });
+});
+
+/* ── Users (admin provisioning: bots, operator accounts) ── */
+
+adminRoutes.post("/admin/users", requirePlatformSession, requireAdmin, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = AdminUserCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "name and a unique email are required");
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+
+  if (parsed.data.isBot && !parsed.data.clientId) {
+    return apiError(c, 400, "CLIENT_ID_REQUIRED", "clientId is required for bot accounts");
+  }
+
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  if (existing) {
+    return apiError(c, 409, "EMAIL_EXISTS", "A user with this email already exists");
+  }
+
+  if (parsed.data.clientId) {
+    const owner = await db
+      .select({ clientId: gameClients.clientId })
+      .from(gameClients)
+      .where(eq(gameClients.clientId, parsed.data.clientId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+    if (!owner) {
+      return apiError(c, 404, "GAME_NOT_FOUND", `Unknown clientId: ${parsed.data.clientId}`);
+    }
+  }
+
+  const [created] = await db
+    .insert(users)
+    .values({
+      name: parsed.data.name.trim(),
+      email,
+      isBot: parsed.data.isBot,
+      isAdmin: parsed.data.isAdmin,
+      clientId: parsed.data.clientId ?? null,
+    })
+    .returning();
+
+  if (!created) {
+    return apiError(c, 500, "CREATE_FAILED", "Failed to create user");
+  }
+
+  return c.json(
+    {
+      user: {
+        id: created.id,
+        name: created.name,
+        email: created.email,
+        isBot: created.isBot,
+        isAdmin: created.isAdmin,
+        createdAt: created.createdAt.toISOString(),
+      },
+    },
+    201,
+  );
+});
+
+/** Admin credit to any user's live wallet (e.g. fund bots). */
+adminRoutes.post("/admin/users/:id/credit", requirePlatformSession, requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  const target = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!target) {
+    return apiError(c, 404, "USER_NOT_FOUND", "User not found");
+  }
+
+  const body = await c.req.json().catch(() => null);
+  const parsed = AdminUserCreditSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "amountCents (positive int) is required");
+  }
+
+  const referenceId =
+    parsed.data.referenceId ?? `admin_credit_${id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const result = await applyLedgerMutation({
+    userId: id,
+    clientId: "platform",
+    environment: "live",
+    type: "credit",
+    amountCents: parsed.data.amountCents,
+    reason: parsed.data.reason ?? "admin_investment",
+    referenceId,
+  });
+
+  if (!result.ok) {
+    return apiError(c, 409, result.code, result.message);
+  }
+
+  return c.json({
+    txId: result.txId,
+    balanceCents: result.balanceCents,
+    currency: "HTG" as const,
+    replay: result.replay,
   });
 });
 

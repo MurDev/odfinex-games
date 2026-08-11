@@ -21,6 +21,9 @@ export const users = pgTable("user", {
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  isBot: boolean("is_bot").notNull().default(false),
+  /** Owner game client for provisioned accounts (bots, operators). Null for self-registered humans. */
+  clientId: text("client_id"),
   allowSelfReview: boolean("allow_self_review").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });

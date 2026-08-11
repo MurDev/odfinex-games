@@ -16,6 +16,7 @@ export const UserSchema = z.object({
   email: z.string().email().nullable(),
   avatarUrl: z.string().url().nullable(),
   isAdmin: z.boolean().optional(),
+  isBot: z.boolean().optional(),
   createdAt: z.string().datetime(),
 });
 
@@ -256,6 +257,7 @@ export type ClientTransactionsResponse = z.infer<
 
 export const AdminStatsSchema = z.object({
   totalUsers: z.number().int().nonnegative(),
+  totalBots: z.number().int().nonnegative(),
   totalGames: z.number().int().nonnegative(),
   totalTransactions: z.number().int().nonnegative(),
   totalWalletBalance: z.number().int().nonnegative(),
@@ -311,12 +313,91 @@ export const AdminPlayerSchema = z.object({
   email: z.string().email().nullable(),
   avatarUrl: z.string().url().nullable(),
   isAdmin: z.boolean(),
+  isBot: z.boolean(),
   createdAt: z.string(),
   balanceCents: z.number().int().nonnegative(),
   transactionCount: z.number().int().nonnegative(),
 });
 
 export type AdminPlayer = z.infer<typeof AdminPlayerSchema>;
+
+export const AdminUserCreateSchema = z.object({
+  name: z.string().min(1).max(64),
+  /** Unique. Bots use synthetic addresses (e.g. bot.<slug>@<client>.bots). */
+  email: z.string().email().max(254),
+  isBot: z.boolean().optional().default(false),
+  isAdmin: z.boolean().optional().default(false),
+  /** Owner game client (required for bots). Grants S2S mutation rights for this account. */
+  clientId: z.string().min(1).max(64).optional(),
+});
+
+export type AdminUserCreate = z.infer<typeof AdminUserCreateSchema>;
+
+export const AdminUserResponseSchema = z.object({
+  user: z.object({
+    id: z.string(),
+    name: z.string().nullable(),
+    email: z.string(),
+    isBot: z.boolean(),
+    isAdmin: z.boolean(),
+    createdAt: z.string(),
+  }),
+});
+
+export type AdminUserResponse = z.infer<typeof AdminUserResponseSchema>;
+
+export const AdminUserCreditSchema = z.object({
+  amountCents: z.number().int().positive(),
+  reason: z.string().min(1).max(64).optional(),
+  referenceId: z.string().min(1).max(128).optional(),
+});
+
+export type AdminUserCredit = z.infer<typeof AdminUserCreditSchema>;
+
+/** Bulk S2S wallet balances for a list of platform users (e.g. game bots). */
+export const ClientBalancesRequestSchema = z.object({
+  userIds: z.array(z.string().min(1).max(128)).max(200),
+});
+
+export type ClientBalancesRequest = z.infer<typeof ClientBalancesRequestSchema>;
+
+export const ClientBalanceEntrySchema = z.object({
+  userId: z.string(),
+  balanceCents: z.number().int().nonnegative(),
+  currency: z.literal("HTG"),
+});
+
+export type ClientBalanceEntry = z.infer<typeof ClientBalanceEntrySchema>;
+
+export const ClientBalancesResponseSchema = z.object({
+  items: z.array(ClientBalanceEntrySchema),
+});
+
+export type ClientBalancesResponse = z.infer<typeof ClientBalancesResponseSchema>;
+
+/** S2S provisioning of a game-owned bot account (created as an is_bot user). */
+export const ClientBotCreateRequestSchema = z.object({
+  name: z.string().min(1).max(64),
+  /** Optional custom email; defaults to a synthetic bot.<slug>@<client>.bots. */
+  email: z.string().email().max(254).optional(),
+  /** Optional initial live-wallet seed (cents), credited as admin_investment. */
+  initialBalanceCents: z.number().int().nonnegative().max(10_000_000).optional(),
+});
+
+export type ClientBotCreateRequest = z.infer<typeof ClientBotCreateRequestSchema>;
+
+export const ClientBotCreateResponseSchema = z.object({
+  user: z.object({
+    id: z.string(),
+    name: z.string().nullable(),
+    email: z.string(),
+    isBot: z.boolean(),
+    createdAt: z.string(),
+  }),
+  balanceCents: z.number().int().nonnegative(),
+});
+
+export type ClientBotCreateResponse = z.infer<typeof ClientBotCreateResponseSchema>;
 
 export const ClientSecretResponseSchema = z.object({
   clientId: z.string(),

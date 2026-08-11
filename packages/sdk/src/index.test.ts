@@ -242,6 +242,57 @@ describe("OdfinexGamesClient", () => {
     ).rejects.toMatchObject({ code: "MISSING_CLIENT_SECRET" });
   });
 
+  it("createBot provisions a bot and seeds its wallet", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://localhost:4000/v1/client/bots");
+      const headers = init?.headers as Record<string, string>;
+      expect(headers["x-client-id"]).toBe("duelpion.live");
+      expect(headers["x-client-secret"]).toBe("sec");
+      expect(headers["x-client-signature"]).toBeTruthy();
+      const body = JSON.parse(String(init?.body));
+      expect(body.name).toBe("Robot A");
+      expect(body.initialBalanceCents).toBe(5000);
+      return Response.json(
+        {
+          user: {
+            id: "bot-1",
+            name: "Robot A",
+            email: "robot-a@duelpion.live.bots",
+            isBot: true,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          balanceCents: 5000,
+        },
+        { status: 201 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+      clientSecret: "sec",
+    });
+    const res = await client.createBot({
+      name: "Robot A",
+      initialBalanceCents: 5000,
+    });
+    expect(res.user.id).toBe("bot-1");
+    expect(res.user.isBot).toBe(true);
+    expect(res.balanceCents).toBe(5000);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("createBot fails without clientSecret", async () => {
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+    });
+    await expect(client.createBot({ name: "Bot" })).rejects.toMatchObject({
+      code: "MISSING_CLIENT_SECRET",
+    });
+  });
+
   it("createDeposit posts with launch token and returns redirectUrl", async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       expect(url).toBe("http://localhost:4000/v1/wallet/deposit");

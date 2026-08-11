@@ -9,6 +9,8 @@ export function toPublicUser(row: DbUser): User {
     displayName: row.name,
     email: row.email,
     avatarUrl: row.image && row.image.length > 0 ? row.image : null,
+    isAdmin: row.isAdmin,
+    isBot: row.isBot,
     createdAt: row.createdAt.toISOString(),
   };
 }

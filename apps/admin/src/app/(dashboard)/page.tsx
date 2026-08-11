@@ -3,13 +3,13 @@ import { adminServerFetch } from "@/lib/server-fetch";
 import { formatHtg } from "@/lib/api";
 import type { AdminStats } from "@odfinex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Gamepad2, ArrowLeftRight, Wallet } from "lucide-react";
+import { Users, Bot, Gamepad2, ArrowLeftRight, Wallet } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  let stats: AdminStats = { totalUsers: 0, totalGames: 0, totalTransactions: 0, totalWalletBalance: 0, totalVolumeCents: 0 };
+  let stats: AdminStats = { totalUsers: 0, totalBots: 0, totalGames: 0, totalTransactions: 0, totalWalletBalance: 0, totalVolumeCents: 0 };
   let error: string | null = null;
 
   try {
@@ -31,6 +31,7 @@ export default async function DashboardPage() {
 
   const cards = [
     { title: "Joueurs", value: stats.totalUsers, icon: Users, description: "Comptes inscrits" },
+    { title: "Bots", value: stats.totalBots, icon: Bot, description: "Comptes provisionnes (jeux)" },
     { title: "Jeux", value: stats.totalGames, icon: Gamepad2, description: "Jeux enregistres" },
     { title: "Transactions", value: stats.totalTransactions, icon: ArrowLeftRight, description: "Ecritures ledger" },
     { title: "Solde total", value: formatHtg(stats.totalWalletBalance), icon: Wallet, description: "Balance cumulee" },
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-muted-foreground">Vue d&apos;ensemble de la plateforme Odfinex Games</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {cards.map((card) => (
           <Card key={card.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">

@@ -22,9 +22,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export default async function PlayersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string }>;
+  searchParams: Promise<{ search?: string; type?: string }>;
 }) {
-  const { search } = await searchParams;
+  const { search, type } = await searchParams;
+  const typeFilter = type === "bot" ? "bot" : type === "human" ? "human" : "all";
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -33,9 +34,12 @@ export default async function PlayersPage({
   let error: string | null = null;
 
   try {
-    const query = search ? `?search=${encodeURIComponent(search)}` : "";
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (typeFilter !== "all") params.set("type", typeFilter);
+    const qs = params.toString();
     const data = await adminServerFetch<{ players: AdminPlayer[]; total: number }>(
-      `/admin/players${query}`,
+      `/admin/players${qs ? `?${qs}` : ""}`,
     );
     players = data.players;
     total = data.total;
@@ -55,10 +59,12 @@ export default async function PlayersPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Joueurs</h1>
-        <p className="text-sm text-muted-foreground">{total} joueurs inscrits</p>
+        <p className="text-sm text-muted-foreground">
+          {total} {typeFilter === "bot" ? "comptes bots" : typeFilter === "human" ? "joueurs inscrits" : "comptes"}
+        </p>
       </div>
 
-      <PlayersSearch defaultValue={search ?? ""} />
+      <PlayersSearch defaultValue={search ?? ""} type={typeFilter} />
 
       <Card>
         <CardContent className="p-0">
@@ -96,10 +102,12 @@ export default async function PlayersPage({
                     </TableCell>
                     <TableCell className="text-muted-foreground">{player.email}</TableCell>
                     <TableCell>
-                      {player.isAdmin ? (
+                      {player.isBot ? (
+                        <Badge variant="secondary">Bot</Badge>
+                      ) : player.isAdmin ? (
                         <Badge variant="default">Admin</Badge>
                       ) : (
-                        <Badge variant="secondary">Joueur</Badge>
+                        <Badge variant="outline">Joueur</Badge>
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-sm">{formatHtg(player.balanceCents)}</TableCell>

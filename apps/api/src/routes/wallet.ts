@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import {
   depositOrders,
   gameClients,
@@ -9,10 +9,13 @@ import {
   paymentRailConfigs,
   sessions,
   users,
+  walletAccounts,
   withdrawalRequests,
 } from "@odfinex/db";
 import type { WalletEnvironment } from "@odfinex/shared";
 import {
+  ClientBalancesRequestSchema,
+  ClientBotCreateRequestSchema,
   ManualDepositRequestCreateSchema,
   WalletCreditUserRequestSchema,
   WalletDepositRequestSchema,
@@ -224,6 +227,56 @@ walletRoutes.route("/", money);
 /** S2S credit to offline user (no launch token) */
 const s2s = new Hono<S2SEnv>();
 
+/**
+ * A game client may only mutate wallets of users that are linked to it:
+ * an active launch token for this client, existing ledger activity for this
+ * client, or a provisioned account (bot/operator) owned by this client.
+ */
+async function isUserLinkedToClient(
+  userId: string,
+  clientId: string,
+): Promise<boolean> {
+  const row = await db
+    .select({ id: users.id })
+    .from(users)
+    .leftJoin(
+      launchTokens,
+      and(
+        eq(launchTokens.userId, users.id),
+        eq(launchTokens.clientId, clientId),
+        gt(launchTokens.expiresAt, new Date()),
+      ),
+    )
+    .where(
+      or(
+        eq(users.clientId, clientId),
+        sql`EXISTS (
+          SELECT 1 FROM ledger_entry le
+          WHERE le.user_id = ${userId} AND le.client_id = ${clientId}
+        )`,
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (row) return true;
+
+  const launched = await db
+    .select({ id: launchTokens.id })
+    .from(launchTokens)
+    .where(
+      and(
+        eq(launchTokens.userId, userId),
+        eq(launchTokens.clientId, clientId),
+        gt(launchTokens.expiresAt, new Date()),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  return Boolean(launched);
+}
+
 s2s.post("/wallet/credit-user", requireS2SClientAuth, async (c) => {
   const clientId = c.get("clientId");
   const environment = c.get("environment");
@@ -257,6 +310,15 @@ s2s.post("/wallet/credit-user", requireS2SClientAuth, async (c) => {
     return apiError(c, 404, "USER_NOT_FOUND", "platformUserId does not exist");
   }
 
+  if (!(await isUserLinkedToClient(target.id, clientId))) {
+    return apiError(
+      c,
+      403,
+      "USER_NOT_LINKED_TO_CLIENT",
+      "Target user has no relationship with this game client",
+    );
+  }
+
   const result = await applyLedgerMutation({
     userId: target.id,
     clientId,
@@ -269,6 +331,71 @@ s2s.post("/wallet/credit-user", requireS2SClientAuth, async (c) => {
 
   if (!result.ok) {
     return apiError(c, 409, result.code, result.message);
+  }
+
+  return c.json({
+    txId: result.txId,
+    balanceCents: result.balanceCents,
+    currency: "HTG" as const,
+  });
+});
+
+/** S2S debit to offline user (no launch token) — e.g. game bots, operator accounts. */
+s2s.post("/wallet/debit-user", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const environment = c.get("environment");
+  const walletEnabled = c.get("walletEnabled");
+  const rawBody = c.get("rawBody");
+
+  if (!walletEnabled) {
+    return apiError(c, 403, "GAME_NOT_ALLOWED", "Wallet is disabled for this game");
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return apiError(c, 400, "INVALID_BODY", "Invalid JSON body");
+  }
+
+  const parsed = WalletCreditUserRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "Invalid debit-user request");
+  }
+
+  const target = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, parsed.data.platformUserId))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!target) {
+    return apiError(c, 404, "USER_NOT_FOUND", "platformUserId does not exist");
+  }
+
+  if (!(await isUserLinkedToClient(target.id, clientId))) {
+    return apiError(
+      c,
+      403,
+      "USER_NOT_LINKED_TO_CLIENT",
+      "Target user has no relationship with this game client",
+    );
+  }
+
+  const result = await applyLedgerMutation({
+    userId: target.id,
+    clientId,
+    environment,
+    type: "debit",
+    amountCents: parsed.data.amountCents,
+    reason: parsed.data.reason,
+    referenceId: parsed.data.referenceId,
+  });
+
+  if (!result.ok) {
+    const status = result.code === "INSUFFICIENT_FUNDS" ? 402 : 409;
+    return apiError(c, status, result.code, result.message);
   }
 
   return c.json({
@@ -300,6 +427,134 @@ s2s.get("/client/balance", requireS2SClientAuth, async (c) => {
 
   const balanceCents = await getBalanceCents(userId, environment);
   return c.json({ userId, balanceCents, currency: "HTG" as const });
+});
+
+/** S2S bulk read-only balances (e.g. game bots eligibility). */
+s2s.post("/client/balances", requireS2SClientAuth, async (c) => {
+  const environment = c.get("environment");
+  const rawBody = c.get("rawBody");
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return apiError(c, 400, "INVALID_BODY", "Invalid JSON body");
+  }
+
+  const parsed = ClientBalancesRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "Invalid balances request");
+  }
+
+  const rows = await db
+    .select({
+      userId: walletAccounts.userId,
+      balanceCents: walletAccounts.balanceCents,
+    })
+    .from(walletAccounts)
+    .where(
+      and(
+        eq(walletAccounts.environment, environment),
+        inArray(walletAccounts.userId, parsed.data.userIds),
+      ),
+    );
+
+  const byId = new Map(rows.map((r) => [r.userId, r.balanceCents]));
+  return c.json({
+    items: parsed.data.userIds.map((userId) => ({
+      userId,
+      balanceCents: byId.get(userId) ?? 0,
+      currency: "HTG" as const,
+    })),
+  });
+});
+
+/** S2S provisioning of a game-owned bot account (is_bot user owned by this client). */
+s2s.post("/client/bots", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const environment = c.get("environment");
+  const walletEnabled = c.get("walletEnabled");
+  const rawBody = c.get("rawBody");
+
+  if (!walletEnabled) {
+    return apiError(c, 403, "GAME_NOT_ALLOWED", "Wallet is disabled for this game");
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return apiError(c, 400, "INVALID_BODY", "Invalid JSON body");
+  }
+
+  const parsed = ClientBotCreateRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "Invalid bot create request");
+  }
+
+  const slug =
+    parsed.data.name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "bot";
+  const email = (parsed.data.email ?? `${slug}@${clientId}.bots`).trim().toLowerCase();
+
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  if (existing) {
+    return apiError(c, 409, "EMAIL_EXISTS", "A user with this email already exists");
+  }
+
+  const [created] = await db
+    .insert(users)
+    .values({
+      name: parsed.data.name.trim(),
+      email,
+      isBot: true,
+      clientId,
+    })
+    .returning();
+
+  if (!created) {
+    return apiError(c, 500, "CREATE_FAILED", "Failed to create bot user");
+  }
+
+  let balanceCents = 0;
+  if (parsed.data.initialBalanceCents != null && parsed.data.initialBalanceCents > 0) {
+    const result = await applyLedgerMutation({
+      userId: created.id,
+      clientId,
+      environment,
+      type: "credit",
+      amountCents: parsed.data.initialBalanceCents,
+      reason: "admin_investment",
+      referenceId: `bot_seed_${created.id}`,
+    });
+    if (!result.ok) {
+      return apiError(c, 409, result.code, result.message);
+    }
+    balanceCents = result.balanceCents;
+  }
+
+  return c.json(
+    {
+      user: {
+        id: created.id,
+        name: created.name,
+        email: created.email,
+        isBot: created.isBot,
+        createdAt: created.createdAt.toISOString(),
+      },
+      balanceCents,
+    },
+    201,
+  );
 });
 
 /**

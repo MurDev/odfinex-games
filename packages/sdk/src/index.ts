@@ -2,6 +2,8 @@
  * @odfinex/games-sdk — identity + wallet client for external games.
  */
 import {
+  ClientBalancesResponseSchema,
+  ClientBotCreateResponseSchema,
   ClientTransactionsResponseSchema,
   SessionResponseSchema,
   WalletBalanceSchema,
@@ -10,6 +12,8 @@ import {
   WalletMutationResponseSchema,
   WalletTransactionsResponseSchema,
   WalletWithdrawResponseSchema,
+  type ClientBalancesResponse,
+  type ClientBotCreateResponse,
   type ClientTransactionsResponse,
   type SessionResponse,
   type User,
@@ -287,6 +291,126 @@ export class OdfinexGamesClient {
     }
 
     return WalletMutationResponseSchema.parse(await res.json());
+  }
+
+  /**
+   * S2S debit to a platform user who may be offline (no launch token).
+   * Requires `clientSecret`. Used for game bots and operator accounts.
+   */
+  async debitToUser(input: {
+    platformUserId: string;
+    amountCents: number;
+    reason: string;
+    referenceId: string;
+  }): Promise<WalletMutationResponse> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(
+        401,
+        "MISSING_CLIENT_SECRET",
+        "clientSecret is required for debitToUser",
+      );
+    }
+
+    const timestamp = Date.now().toString();
+    const body = JSON.stringify(input);
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+
+    const res = await fetch(`${this.baseUrl}/v1/wallet/debit-user`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-client-id": this.clientId,
+        "x-client-secret": this.clientSecret,
+        "x-timestamp": timestamp,
+        "x-client-signature": signature,
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/wallet/debit-user failed (${res.status})`);
+    }
+
+    return WalletMutationResponseSchema.parse(await res.json());
+  }
+
+  /**
+   * S2S bulk balances for a list of platform users (e.g. game bots eligibility).
+   * Requires `clientSecret`. Users not yet provisioned return balance 0.
+   */
+  async getBalances(userIds: string[]): Promise<ClientBalancesResponse> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(
+        401,
+        "MISSING_CLIENT_SECRET",
+        "clientSecret is required for getBalances",
+      );
+    }
+
+    const timestamp = Date.now().toString();
+    const body = JSON.stringify({ userIds });
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+
+    const res = await fetch(`${this.baseUrl}/v1/client/balances`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-client-id": this.clientId,
+        "x-client-secret": this.clientSecret,
+        "x-timestamp": timestamp,
+        "x-client-signature": signature,
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/client/balances failed (${res.status})`);
+    }
+
+    return ClientBalancesResponseSchema.parse(await res.json());
+  }
+
+  /**
+   * S2S provision a game-owned bot account (is_bot user owned by this client).
+   * Requires `clientSecret`. Optionally seeds the live wallet via `initialBalanceCents`.
+   */
+  async createBot(input: {
+    name: string;
+    email?: string;
+    initialBalanceCents?: number;
+  }): Promise<ClientBotCreateResponse> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(
+        401,
+        "MISSING_CLIENT_SECRET",
+        "clientSecret is required for createBot",
+      );
+    }
+
+    const timestamp = Date.now().toString();
+    const body = JSON.stringify(input);
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+
+    const res = await fetch(`${this.baseUrl}/v1/client/bots`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-client-id": this.clientId,
+        "x-client-secret": this.clientSecret,
+        "x-timestamp": timestamp,
+        "x-client-signature": signature,
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/client/bots failed (${res.status})`);
+    }
+
+    return ClientBotCreateResponseSchema.parse(await res.json());
   }
 
   /**
@@ -687,6 +811,10 @@ export {
   WalletDepositCompleteResponseSchema,
   WalletTransactionsResponseSchema,
   ClientTransactionsResponseSchema,
+  ClientBalancesRequestSchema,
+  ClientBalancesResponseSchema,
+  ClientBotCreateRequestSchema,
+  ClientBotCreateResponseSchema,
   WalletWithdrawResponseSchema,
   type HealthResponse,
   type User,
@@ -700,6 +828,11 @@ export {
   type WalletDepositCompleteResponse,
   type WalletTransactionsResponse,
   type ClientTransactionsResponse,
+  type ClientBalancesRequest,
+  type ClientBalancesResponse,
+  type ClientBalanceEntry,
+  type ClientBotCreateRequest,
+  type ClientBotCreateResponse,
   type WalletWithdrawRequest,
   type WalletWithdrawResponse,
   type LedgerEntry,
