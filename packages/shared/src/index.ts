@@ -9,7 +9,6 @@ export const HealthResponseSchema = z.object({
 
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 
-/** Public player profile exposed to games via SDK */
 export const UserSchema = z.object({
   id: z.string(),
   displayName: z.string().nullable(),
@@ -69,14 +68,32 @@ export const GamesListResponseSchema = z.object({
 
 export type GamesListResponse = z.infer<typeof GamesListResponseSchema>;
 
-/** Wallet environment — sandbox (test funds) vs live (real funds) */
 export const WalletEnvironmentSchema = z.enum(["sandbox", "live"]);
 
 export type WalletEnvironment = z.infer<typeof WalletEnvironmentSchema>;
 
-/** Wallet — HTG cents only (no floats) */
+export const LedgerCategorySchema = z.enum([
+  "admin_investment",
+  "admin_debit",
+  "deposit",
+  "depot_manual",
+  "bonus",
+  "reward",
+  "grant",
+  "refund",
+  "withdrawal",
+  "game",
+  "natcash_deposit",
+  "moncash_withdraw_refund",
+  "withdraw_reject_refund",
+  "withdraw_cancel_refund",
+]);
+
+export type LedgerCategory = z.infer<typeof LedgerCategorySchema>;
+
 export const WalletBalanceSchema = z.object({
   balanceCents: z.number().int().nonnegative(),
+  bonusCents: z.number().int().nonnegative(),
   currency: z.literal("HTG"),
 });
 
@@ -93,12 +110,12 @@ export type WalletMutationRequest = z.infer<typeof WalletMutationRequestSchema>;
 export const WalletMutationResponseSchema = z.object({
   txId: z.string(),
   balanceCents: z.number().int().nonnegative(),
+  bonusCents: z.number().int().nonnegative(),
   currency: z.literal("HTG"),
 });
 
 export type WalletMutationResponse = z.infer<typeof WalletMutationResponseSchema>;
 
-/** S2S credit to a user who is not in-session (e.g. referral commission) */
 export const WalletCreditUserRequestSchema = z.object({
   platformUserId: z.string().min(1).max(128),
   amountCents: z.number().int().positive(),
@@ -141,10 +158,8 @@ export type WalletDepositCompleteResponse = z.infer<
 export const WalletWithdrawRequestSchema = z.object({
   amountHtg: z.number().int().min(10).max(75_000),
   method: z.enum(["moncash", "natcash"]).optional().default("moncash"),
-  /** MonCash phone (8 digits) or NatCash account number */
   account: z.string().min(3).max(64).optional(),
   accountName: z.string().min(1).max(128).optional(),
-  /** @deprecated use account — kept for MonCash callers */
   phone: z
     .string()
     .min(8)
@@ -175,7 +190,9 @@ export const ManualDepositRequestCreateSchema = z.object({
   paymentProofUrl: z.string().url().optional(),
 });
 
-export type ManualDepositRequestCreate = z.infer<typeof ManualDepositRequestCreateSchema>;
+export type ManualDepositRequestCreate = z.infer<
+  typeof ManualDepositRequestCreateSchema
+>;
 
 export const ManualDepositRequestSchema = z.object({
   id: z.string(),
@@ -214,11 +231,14 @@ export const LedgerEntrySchema = z.object({
   id: z.string(),
   type: z.enum(["debit", "credit"]),
   amountCents: z.number().int().positive(),
+  bonusCents: z.number().int().nonnegative(),
   balanceAfterCents: z.number().int().nonnegative(),
   reason: z.string(),
   clientId: z.string(),
   environment: WalletEnvironmentSchema,
   referenceId: z.string(),
+  category: LedgerCategorySchema,
+  actorId: z.string().optional(),
   createdAt: z.string().datetime(),
 });
 
@@ -233,7 +253,6 @@ export type WalletTransactionsResponse = z.infer<
   typeof WalletTransactionsResponseSchema
 >;
 
-/** Game-admin S2S ledger row (includes user identity). */
 export const ClientLedgerEntrySchema = LedgerEntrySchema.extend({
   userId: z.string(),
   displayName: z.string().nullable().optional(),
@@ -252,8 +271,6 @@ export const ClientTransactionsResponseSchema = z.object({
 export type ClientTransactionsResponse = z.infer<
   typeof ClientTransactionsResponseSchema
 >;
-
-/* ─── Admin schemas ─── */
 
 export const AdminStatsSchema = z.object({
   totalUsers: z.number().int().nonnegative(),
@@ -322,6 +339,7 @@ export const AdminPlayerSchema = z.object({
   isBot: z.boolean(),
   createdAt: z.string(),
   balanceCents: z.number().int().nonnegative(),
+  bonusCents: z.number().int().nonnegative(),
   transactionCount: z.number().int().nonnegative(),
 });
 
@@ -329,11 +347,9 @@ export type AdminPlayer = z.infer<typeof AdminPlayerSchema>;
 
 export const AdminUserCreateSchema = z.object({
   name: z.string().min(1).max(64),
-  /** Unique. Bots use synthetic addresses (e.g. bot.<slug>@<client>.bots). */
   email: z.string().email().max(254),
   isBot: z.boolean().optional().default(false),
   isAdmin: z.boolean().optional().default(false),
-  /** Owner game client (required for bots). Grants S2S mutation rights for this account. */
   clientId: z.string().min(1).max(64).optional(),
 });
 
@@ -356,16 +372,20 @@ export const AdminUserCreditSchema = z.object({
   amountCents: z.number().int().positive(),
   reason: z.string().min(1).max(64).optional(),
   referenceId: z.string().min(1).max(128).optional(),
+  category: LedgerCategorySchema.optional().default("admin_investment"),
 });
 
 export type AdminUserCredit = z.infer<typeof AdminUserCreditSchema>;
 
-/** Same shape as credit; the endpoint applies a ledger debit instead. */
-export const AdminUserDebitSchema = AdminUserCreditSchema;
+export const AdminUserDebitSchema = z.object({
+  amountCents: z.number().int().positive(),
+  reason: z.string().min(1).max(64).optional(),
+  referenceId: z.string().min(1).max(128).optional(),
+  category: LedgerCategorySchema.optional().default("admin_debit"),
+});
 
 export type AdminUserDebit = z.infer<typeof AdminUserDebitSchema>;
 
-/** Provisioned account (bot or game operator) for the /admin/accounts list. */
 export const AdminAccountSchema = z.object({
   id: z.string(),
   displayName: z.string().nullable(),
@@ -375,13 +395,13 @@ export const AdminAccountSchema = z.object({
   clientId: z.string().nullable(),
   gameName: z.string().nullable(),
   balanceCents: z.number().int().nonnegative(),
+  bonusCents: z.number().int().nonnegative(),
   transactionCount: z.number().int().nonnegative(),
   createdAt: z.string(),
 });
 
 export type AdminAccount = z.infer<typeof AdminAccountSchema>;
 
-/** Bulk S2S wallet balances for a list of platform users (e.g. game bots). */
 export const ClientBalancesRequestSchema = z.object({
   userIds: z.array(z.string().min(1).max(128)).max(200),
 });
@@ -391,6 +411,7 @@ export type ClientBalancesRequest = z.infer<typeof ClientBalancesRequestSchema>;
 export const ClientBalanceEntrySchema = z.object({
   userId: z.string(),
   balanceCents: z.number().int().nonnegative(),
+  bonusCents: z.number().int().nonnegative(),
   currency: z.literal("HTG"),
 });
 
@@ -402,12 +423,9 @@ export const ClientBalancesResponseSchema = z.object({
 
 export type ClientBalancesResponse = z.infer<typeof ClientBalancesResponseSchema>;
 
-/** S2S provisioning of a game-owned bot account (created as an is_bot user). */
 export const ClientBotCreateRequestSchema = z.object({
   name: z.string().min(1).max(64),
-  /** Optional custom email; defaults to a synthetic bot.<slug>@<client>.bots. */
   email: z.string().email().max(254).optional(),
-  /** Optional initial live-wallet seed (cents), credited as admin_investment. */
   initialBalanceCents: z.number().int().nonnegative().max(10_000_000).optional(),
 });
 

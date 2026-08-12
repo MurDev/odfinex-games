@@ -36,6 +36,9 @@ export function CreditDebitDialog({
   const [error, setError] = useState("");
   const [amountHtg, setAmountHtg] = useState("");
   const [reason, setReason] = useState("");
+  const [category, setCategory] = useState(
+    direction === "credit" ? "admin_investment" : "admin_debit",
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,6 +58,7 @@ export function CreditDebitDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountCents,
+          category,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
         }),
       });
@@ -90,11 +94,11 @@ export function CreditDebitDialog({
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{isCredit ? "Crediter" : "Debiter"} le compte</DialogTitle>
-            <DialogDescription>
-              {displayName ?? email} (solde actuel{" "}
-              <span className="font-mono">{(balanceCents / 100).toFixed(2)} HTG</span>
-              )
-            </DialogDescription>
+          <DialogDescription>
+            {displayName ?? email} (solde actuel{" "}
+            <span className="font-mono">{(balanceCents / 100).toFixed(2)} HTG</span>
+            )
+          </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -108,6 +112,29 @@ export function CreditDebitDialog({
                 onChange={(e) => setAmountHtg(e.target.value)}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Categorie</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {direction === "credit" ? (
+                  <>
+                    <option value="admin_investment">Approvisionnement</option>
+                    <option value="bonus">Bonus</option>
+                    <option value="refund">Remboursement</option>
+                    <option value="grant">Grant test</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="admin_debit">Debit admin</option>
+                    <option value="withdrawal">Retrait</option>
+                    <option value="game">Jeu</option>
+                  </>
+                )}
+              </select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Motif (optionnel)</label>

@@ -37,8 +37,8 @@ export default async function WalletPage({
   ]);
 
   const balance = balanceRes.ok
-    ? ((await balanceRes.json()) as { balanceCents: number })
-    : { balanceCents: 0 };
+    ? ((await balanceRes.json()) as { balanceCents: number; bonusCents: number })
+    : { balanceCents: 0, bonusCents: 0 };
   const txs = txRes.ok
     ? ((await txRes.json()) as {
         items: Array<{
@@ -90,8 +90,13 @@ export default async function WalletPage({
       >
         <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.7 }}>Solde jouable</p>
         <p style={{ margin: "0.35rem 0 0", fontSize: "2rem", fontWeight: 700 }}>
-          {formatHtg(balance.balanceCents)}
+          {formatHtg(balance.balanceCents - balance.bonusCents)}
         </p>
+        {balance.bonusCents > 0 && (
+          <p style={{ margin: "0.35rem 0 0", fontSize: "0.85rem", opacity: 0.7 }}>
+            Bonus non retirable : {formatHtg(balance.bonusCents)}
+          </p>
+        )}
       </div>
 
       <DepositForm />

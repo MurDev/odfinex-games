@@ -351,12 +351,16 @@ adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c
   }
 
   const liveBalance = db
-    .select({ balance: walletAccounts.balanceCents })
+    .select({
+      balance: walletAccounts.balanceCents,
+      bonus: walletAccounts.bonusCents,
+    })
     .from(walletAccounts)
     .where(and(eq(walletAccounts.userId, users.id), eq(walletAccounts.environment, "live")))
     .limit(1);
 
   const balanceCents = sql<number>`${liveBalance}`;
+  const bonusCents = sql<number>`coalesce(${liveBalance}.bonus, 0)`;
   const transactionCount = db.$count(ledgerEntries, eq(ledgerEntries.userId, users.id));
 
   const orderBy: SQL =
@@ -386,6 +390,7 @@ adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c
       isBot: users.isBot,
       createdAt: users.createdAt,
       balanceCents,
+      bonusCents,
       transactionCount,
     })
     .from(users)
@@ -408,6 +413,7 @@ adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c
     isBot: u.isBot,
     createdAt: u.createdAt.toISOString(),
     balanceCents: u.balanceCents ?? 0,
+    bonusCents: u.bonusCents ?? 0,
     transactionCount: u.transactionCount ?? 0,
   }));
 
@@ -428,6 +434,7 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
   const walletRows = await db
     .select({
       balanceCents: walletAccounts.balanceCents,
+      bonusCents: walletAccounts.bonusCents,
       environment: walletAccounts.environment,
     })
     .from(walletAccounts)
@@ -435,6 +442,8 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
 
   const live =
     walletRows.find((r) => r.environment === "live")?.balanceCents ?? 0;
+  const liveBonus =
+    walletRows.find((r) => r.environment === "live")?.bonusCents ?? 0;
   const sandbox =
     walletRows.find((r) => r.environment === "sandbox")?.balanceCents ?? 0;
 
@@ -461,6 +470,7 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
       createdAt: user.createdAt.toISOString(),
       balanceCents: live,
       sandboxBalanceCents: sandbox,
+      bonusCents: liveBonus,
       transactionCount: txCount?.count ?? 0,
     },
     transactions: txs.map((tx) => ({
@@ -468,6 +478,9 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
       type: tx.type,
       amountCents: tx.amountCents,
       balanceAfterCents: tx.balanceAfterCents,
+      bonusCents: tx.bonusCents,
+      category: tx.category,
+      actorId: tx.actorId,
       reason: tx.reason,
       clientId: tx.clientId,
       environment: tx.environment as WalletEnvironment,
@@ -494,11 +507,12 @@ adminRoutes.get("/admin/accounts", requirePlatformSession, requireAdmin, async (
   }
 
   const liveBalance = db
-    .select({ balance: walletAccounts.balanceCents })
+    .select({ balance: walletAccounts.balanceCents, bonus: walletAccounts.bonusCents })
     .from(walletAccounts)
     .where(and(eq(walletAccounts.userId, users.id), eq(walletAccounts.environment, "live")))
     .limit(1);
   const balanceCents = sql<number>`${liveBalance}`;
+  const bonusCents = sql<number>`coalesce(${liveBalance}.bonus, 0)`;
   const transactionCount = db.$count(ledgerEntries, eq(ledgerEntries.userId, users.id));
   const ownerGame = db
     .select({ name: gameClients.name })
@@ -517,6 +531,7 @@ adminRoutes.get("/admin/accounts", requirePlatformSession, requireAdmin, async (
       clientId: users.clientId,
       createdAt: users.createdAt,
       balanceCents,
+      bonusCents,
       transactionCount,
       gameName,
     })
@@ -541,6 +556,7 @@ adminRoutes.get("/admin/accounts", requirePlatformSession, requireAdmin, async (
       clientId: u.clientId,
       gameName: u.gameName ?? null,
       balanceCents: u.balanceCents ?? 0,
+      bonusCents: u.bonusCents ?? 0,
       transactionCount: u.transactionCount ?? 0,
       createdAt: u.createdAt.toISOString(),
     })),
@@ -627,6 +643,9 @@ adminRoutes.post("/admin/users/:id/credit", requirePlatformSession, requireAdmin
     return apiError(c, 404, "USER_NOT_FOUND", "User not found");
   }
 
+  const selfError = await assertNotSelf(c, id);
+  if (selfError) return selfError;
+
   const body = await c.req.json().catch(() => null);
   const parsed = AdminUserCreditSchema.safeParse(body);
   if (!parsed.success) {
@@ -636,14 +655,17 @@ adminRoutes.post("/admin/users/:id/credit", requirePlatformSession, requireAdmin
   const referenceId =
     parsed.data.referenceId ?? `admin_credit_${id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  const category = parsed.data.category ?? "admin_investment";
   const result = await applyLedgerMutation({
     userId: id,
     clientId: "platform",
     environment: "live",
     type: "credit",
     amountCents: parsed.data.amountCents,
-    reason: parsed.data.reason ?? "admin_investment",
+    reason: parsed.data.reason ?? category,
     referenceId,
+    bonusCents: category === "bonus" ? parsed.data.amountCents : 0,
+    actorId: c.get("user").id,
   });
 
   if (!result.ok) {
@@ -653,6 +675,7 @@ adminRoutes.post("/admin/users/:id/credit", requirePlatformSession, requireAdmin
   return c.json({
     txId: result.txId,
     balanceCents: result.balanceCents,
+    bonusCents: result.bonusCents,
     currency: "HTG" as const,
     replay: result.replay,
   });
@@ -671,6 +694,9 @@ adminRoutes.post("/admin/users/:id/debit", requirePlatformSession, requireAdmin,
     return apiError(c, 404, "USER_NOT_FOUND", "User not found");
   }
 
+  const selfError = await assertNotSelf(c, id);
+  if (selfError) return selfError;
+
   const body = await c.req.json().catch(() => null);
   const parsed = AdminUserDebitSchema.safeParse(body);
   if (!parsed.success) {
@@ -680,14 +706,16 @@ adminRoutes.post("/admin/users/:id/debit", requirePlatformSession, requireAdmin,
   const referenceId =
     parsed.data.referenceId ?? `admin_debit_${id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  const category = parsed.data.category ?? "admin_debit";
   const result = await applyLedgerMutation({
     userId: id,
     clientId: "platform",
     environment: "live",
     type: "debit",
     amountCents: parsed.data.amountCents,
-    reason: parsed.data.reason ?? "admin_investment",
+    reason: parsed.data.reason ?? category,
     referenceId,
+    actorId: c.get("user").id,
   });
 
   if (!result.ok) {
@@ -697,6 +725,7 @@ adminRoutes.post("/admin/users/:id/debit", requirePlatformSession, requireAdmin,
   return c.json({
     txId: result.txId,
     balanceCents: result.balanceCents,
+    bonusCents: result.bonusCents,
     currency: "HTG" as const,
     replay: result.replay,
   });
@@ -760,6 +789,9 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
         type: tx.type,
         amountCents: tx.amountCents,
         balanceAfterCents: tx.balanceAfterCents,
+        bonusCents: tx.bonusCents,
+        category: tx.category,
+        actorId: tx.actorId,
         reason: tx.reason,
         clientId: tx.clientId,
         environment: tx.environment as WalletEnvironment,

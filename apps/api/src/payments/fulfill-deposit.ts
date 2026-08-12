@@ -6,8 +6,18 @@ import { applyLedgerMutation } from "../lib/wallet.js";
 import { verifyPayment } from "./bazik.js";
 
 export type FulfillResult =
-  | { outcome: "credited"; userId: string; amountCents: number; balanceCents: number }
-  | { outcome: "already_credited"; balanceCents: number }
+  | {
+      outcome: "credited";
+      userId: string;
+      amountCents: number;
+      balanceCents: number;
+      bonusCents: number;
+    }
+  | {
+      outcome: "already_credited";
+      balanceCents: number;
+      bonusCents: number;
+    }
   | { outcome: "pending"; status: string }
   | { outcome: "error"; message: string; retryable?: boolean };
 
@@ -27,7 +37,7 @@ export async function fulfillDeposit(
   }
 
   if (order.status === "successful") {
-    return { outcome: "already_credited", balanceCents: 0 };
+    return { outcome: "already_credited", balanceCents: 0, bonusCents: 0 };
   }
 
   let verified;
@@ -76,7 +86,7 @@ export async function fulfillDeposit(
 
   if (!result.ok) {
     if (result.code === "IDEMPOTENCY_CONFLICT") {
-      return { outcome: "already_credited", balanceCents: 0 };
+      return { outcome: "already_credited", balanceCents: 0, bonusCents: 0 };
     }
     return { outcome: "error", message: result.message, retryable: true };
   }
@@ -98,5 +108,6 @@ export async function fulfillDeposit(
     userId: order.userId,
     amountCents,
     balanceCents: result.balanceCents,
+    bonusCents: result.bonusCents,
   };
 }

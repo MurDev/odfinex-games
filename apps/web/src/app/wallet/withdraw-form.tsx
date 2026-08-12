@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 const apiUrl = (
   process.env.NEXT_PUBLIC_API_URL ??
@@ -16,6 +16,28 @@ export function WithdrawForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [withdrawableCents, setWithdrawableCents] = useState<number | null>(null);
+
+  const amountCents = Number.parseInt(amount, 10);
+  const canWithdraw =
+    Number.isFinite(amountCents) &&
+    amountCents > 0 &&
+    (withdrawableCents === null || amountCents * 100 <= withdrawableCents);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${apiUrl}/v1/wallet`, { credentials: "include", cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data) {
+          setWithdrawableCents((data.balanceCents - data.bonusCents) * 100);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -92,7 +114,7 @@ export function WithdrawForm() {
         />
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !canWithdraw}
           style={{
             background: "rgba(255,255,255,0.12)",
             color: "inherit",
@@ -100,12 +122,18 @@ export function WithdrawForm() {
             borderRadius: 10,
             padding: "0.7rem 1.1rem",
             fontWeight: 700,
-            cursor: loading ? "wait" : "pointer",
+            cursor: loading || !canWithdraw ? "not-allowed" : "pointer",
+            opacity: canWithdraw ? 1 : 0.6,
           }}
         >
           {loading ? "…" : "Retirer"}
         </button>
       </div>
+      {withdrawableCents !== null && withdrawableCents < (Number.parseInt(amount, 10) * 100 || 0) && (
+        <p style={{ color: "#f87171", fontSize: "0.85rem", marginTop: "0.35rem" }}>
+          Fonds non retirables insuffisants
+        </p>
+      )}
       {message && (
         <p style={{ color: "#34d399", fontSize: "0.85rem", marginTop: "0.35rem" }}>{message}</p>
       )}

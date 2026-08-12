@@ -23,6 +23,9 @@ type TxItem = {
   type: string;
   amountCents: number;
   balanceAfterCents: number;
+  bonusCents: number;
+  category: string | null;
+  actorId: string | null;
   reason: string;
   clientId: string;
   referenceId: string;
@@ -93,59 +96,69 @@ export default async function TransactionsPage({
       <Card>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Joueur</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Montant</TableHead>
-                <TableHead>Solde apres</TableHead>
-                <TableHead>Motif</TableHead>
-                <TableHead>Jeu</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.items.length === 0 ? (
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    Aucune transaction
-                  </TableCell>
+                  <TableHead>Joueur</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Bonus</TableHead>
+                  <TableHead>Solde apres</TableHead>
+                  <TableHead>Categorie</TableHead>
+                  <TableHead>Acteur</TableHead>
+                  <TableHead>Motif</TableHead>
+                  <TableHead>Jeu</TableHead>
+                  <TableHead>Date</TableHead>
                 </TableRow>
-              ) : (
-                data.items.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell>
-                      <Link
-                        href={`/players/${tx.userId}`}
-                        className="flex flex-col leading-tight hover:text-primary"
-                      >
-                        <span className="font-medium">{tx.displayName ?? "Anonyme"}</span>
-                        {tx.email && (
-                          <span className="text-xs text-muted-foreground">{tx.email}</span>
-                        )}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
-                        {tx.type === "credit" ? "Credit" : "Debit"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{formatHtg(tx.amountCents)}</TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {formatHtg(tx.balanceAfterCents)}
-                    </TableCell>
-                    <TableCell className="max-w-[220px] truncate text-muted-foreground">
-                      {tx.reason}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {tx.clientId}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(tx.createdAt).toLocaleString()}
+              </TableHeader>
+              <TableBody>
+                {data.items.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center text-muted-foreground">
+                      Aucune transaction
                     </TableCell>
                   </TableRow>
-                ))
-              )}
+                ) : (
+                  data.items.map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell>
+                        <Link
+                          href={`/players/${tx.userId}`}
+                          className="flex flex-col leading-tight hover:text-primary"
+                        >
+                          <span className="font-medium">{tx.displayName ?? "Anonyme"}</span>
+                          {tx.email && (
+                            <span className="text-xs text-muted-foreground">{tx.email}</span>
+                          )}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
+                          {tx.type === "credit" ? "Credit" : "Debit"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{formatHtg(tx.amountCents)}</TableCell>
+                      <TableCell className="font-mono text-sm">{formatHtg(tx.bonusCents)}</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {formatHtg(tx.balanceAfterCents)}
+                      </TableCell>
+                      <TableCell className="max-w-[120px] truncate text-muted-foreground">
+                        {tx.category ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {tx.actorId ?? "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[220px] truncate text-muted-foreground">
+                        {tx.reason}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {tx.clientId}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(tx.createdAt).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
             </TableBody>
           </Table>
         </CardContent>
