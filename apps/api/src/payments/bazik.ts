@@ -25,11 +25,32 @@ export function isWithdrawDryRun(): boolean {
   return envFlag("BAZIK_WITHDRAW_DRY_RUN") || isBazikMock();
 }
 
+/**
+ * Thrown when a Bazik request never got a response (network error or our own
+ * timeout) — the provider may still have processed it. Callers that would
+ * otherwise auto-refund/auto-fail on any exception must treat this
+ * differently from a definite HTTP-level rejection (`!res.ok`, a real Error):
+ * a `BazikNetworkError` means "outcome unknown", not "outcome is failure".
+ */
+export class BazikNetworkError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "BazikNetworkError";
+  }
+}
+
 async function bazikFetch(url: string, init: RequestInit): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(BAZIK_TIMEOUT_MS),
-  });
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(BAZIK_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new BazikNetworkError(
+      `Bazik request failed before a response was received (network error or timeout after ${BAZIK_TIMEOUT_MS}ms): ${(err as Error).message}`,
+      { cause: err },
+    );
+  }
 }
 
 interface TokenResponse {

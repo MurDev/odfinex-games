@@ -22,6 +22,7 @@ import { requirePlatformSession, type AuthVariables } from "../middleware/auth.j
 import { generateClientSecret } from "../lib/signature.js";
 import { notifyGameWalletEvent } from "../lib/notify-game.js";
 import {
+  BazikNetworkError,
   classifyWithdrawOutcome,
   splitFullName,
   withdrawToMoncash,
@@ -1246,6 +1247,39 @@ adminRoutes.post(
       });
     } catch (err) {
       console.error("[admin withdraw approve] provider error", err);
+
+      if (err instanceof BazikNetworkError) {
+        // We never got a response — Bazik may have processed the payout anyway.
+        // Do NOT auto-refund: that would risk paying the player twice (MonCash
+        // payout + wallet refund). Leave it "processing" for manual reconciliation,
+        // same as a classified "ambiguous" outcome.
+        await db
+          .update(withdrawalRequests)
+          .set({
+            status: "processing",
+            adminComment: `Network/timeout error contacting Bazik, outcome unknown: ${err.message}`,
+          })
+          .where(eq(withdrawalRequests.id, id));
+
+        await notifyGameWalletEvent(row.clientId, {
+          type: "withdrawal_request",
+          requestId: row.id,
+          userId: row.userId,
+          status: "processing",
+          amountCents: row.amountCents,
+          method,
+        });
+
+        return apiError(
+          c,
+          502,
+          "WITHDRAW_AMBIGUOUS",
+          "Could not confirm the payout with Bazik (network error or timeout). Balance was NOT refunded automatically — verify with Bazik support before retrying or refunding manually.",
+        );
+      }
+
+      // Bazik gave us a definite HTTP-level rejection (or another non-network
+      // error) — safe to treat as a real failure and refund.
       await applyLedgerMutation({
         userId: row.userId,
         clientId: "platform",
