@@ -91,20 +91,21 @@ export default async function PlayersPage({
       <Card>
         <CardContent className="p-0">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Joueur</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Solde</TableHead>
-                <TableHead>Transactions</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Joueur</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Solde</TableHead>
+                  <TableHead>Bonus</TableHead>
+                  <TableHead>Transactions</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {players.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     Aucun joueur trouve
                   </TableCell>
                 </TableRow>
@@ -133,6 +134,7 @@ export default async function PlayersPage({
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-sm">{formatHtg(player.balanceCents)}</TableCell>
+                    <TableCell className="font-mono text-sm">{formatHtg(player.bonusCents)}</TableCell>
                     <TableCell>{player.transactionCount}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" asChild>

@@ -121,6 +121,8 @@ export const walletAccounts = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     environment: environmentEnum("environment").notNull().default("live"),
     balanceCents: integer("balance_cents").notNull().default(0),
+    /** Non-withdrawable portion of the balance (lock/bonus funds). Invariant: 0 <= bonusCents <= balanceCents. */
+    bonusCents: integer("bonus_cents").notNull().default(0),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
@@ -143,6 +145,12 @@ export const ledgerEntries = pgTable(
     type: text("type").notNull(), // debit | credit
     amountCents: integer("amount_cents").notNull(),
     balanceAfterCents: integer("balance_after_cents").notNull(),
+    /** Credit category: deposit, depot_manual, bonus, reward, grant, refund… Debits: withdrawal, game… */
+    category: text("category"),
+    /** Bonus (non-withdrawable) share of this entry, in cents. Positive on bonus credits, negative when bonus is consumed by a debit. */
+    bonusCents: integer("bonus_cents").notNull().default(0),
+    /** Admin user who performed a manual credit/debit (audit trail). Null for system/game flows. */
+    actorId: text("actor_id"),
     reason: text("reason").notNull(),
     referenceId: text("reference_id").notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),

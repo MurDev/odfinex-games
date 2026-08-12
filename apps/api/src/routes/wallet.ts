@@ -145,8 +145,13 @@ walletRoutes.get("/wallet", async (c) => {
   if (!ctx) {
     return apiError(c, 401, "UNAUTHORIZED", "Missing session or launch token");
   }
-  const balanceCents = await getBalanceCents(ctx.userId, ctx.environment);
-  return c.json({ balanceCents, currency: "HTG" as const, environment: ctx.environment });
+  const { balanceCents, bonusCents } = await getBalanceCents(ctx.userId, ctx.environment);
+  return c.json({
+    balanceCents,
+    bonusCents,
+    currency: "HTG" as const,
+    environment: ctx.environment,
+  });
 });
 
 const money = new Hono<LaunchEnv>();
@@ -425,8 +430,8 @@ s2s.get("/client/balance", requireS2SClientAuth, async (c) => {
     return apiError(c, 404, "USER_NOT_FOUND", "userId does not exist");
   }
 
-  const balanceCents = await getBalanceCents(userId, environment);
-  return c.json({ userId, balanceCents, currency: "HTG" as const });
+  const { balanceCents, bonusCents } = await getBalanceCents(userId, environment);
+  return c.json({ userId, balanceCents, bonusCents, currency: "HTG" as const });
 });
 
 /** S2S bulk read-only balances (e.g. game bots eligibility). */
@@ -450,6 +455,7 @@ s2s.post("/client/balances", requireS2SClientAuth, async (c) => {
     .select({
       userId: walletAccounts.userId,
       balanceCents: walletAccounts.balanceCents,
+      bonusCents: walletAccounts.bonusCents,
     })
     .from(walletAccounts)
     .where(
@@ -459,13 +465,17 @@ s2s.post("/client/balances", requireS2SClientAuth, async (c) => {
       ),
     );
 
-  const byId = new Map(rows.map((r) => [r.userId, r.balanceCents]));
+  const byId = new Map(rows.map((r) => [r.userId, r]));
   return c.json({
-    items: parsed.data.userIds.map((userId) => ({
-      userId,
-      balanceCents: byId.get(userId) ?? 0,
-      currency: "HTG" as const,
-    })),
+    items: parsed.data.userIds.map((userId) => {
+      const row = byId.get(userId);
+      return {
+        userId,
+        balanceCents: row?.balanceCents ?? 0,
+        bonusCents: row?.bonusCents ?? 0,
+        currency: "HTG" as const,
+      };
+    }),
   });
 });
 
@@ -827,6 +837,9 @@ walletRoutes.get("/wallet/transactions", async (c) => {
       type: row.type as "debit" | "credit",
       amountCents: row.amountCents,
       balanceAfterCents: row.balanceAfterCents,
+      bonusCents: row.bonusCents,
+      category: row.category,
+      actorId: row.actorId,
       reason: row.reason,
       clientId: row.clientId,
       environment: row.environment as WalletEnvironment,
@@ -992,10 +1005,11 @@ deposit.post("/wallet/deposit/:orderId/complete", requireDepositAuth, async (c) 
     return c.json({ status: "pending", providerStatus: result.status });
   }
 
-  const balanceCents = await getBalanceCents(user.id, environment);
+  const depositWalletBalance = await getBalanceCents(user.id, environment);
   return c.json({
     status: "successful",
-    balanceCents,
+    balanceCents: depositWalletBalance.balanceCents,
+    bonusCents: depositWalletBalance.bonusCents,
     outcome: result.outcome,
   });
 });
@@ -1051,9 +1065,10 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
   const amountHtg = parsed.data.amountHtg;
   const amountCents = amountHtg * 100;
 
-  const balance = await getBalanceCents(user.id, environment);
-  if (balance < amountCents) {
-    return apiError(c, 402, "INSUFFICIENT_FUNDS", "Insufficient wallet balance");
+  const withdrawWalletBalance = await getBalanceCents(user.id, environment);
+  const withdrawable = withdrawWalletBalance.balanceCents - withdrawWalletBalance.bonusCents;
+  if (withdrawable < amountCents) {
+    return apiError(c, 402, "INSUFFICIENT_FUNDS", "Insufficient withdrawable balance");
   }
 
   const referenceId = `wd_${user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -1089,13 +1104,14 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
     })
     .returning();
 
-  const balanceCents = await getBalanceCents(user.id, environment);
+  const cancelWalletBalance = await getBalanceCents(user.id, environment);
   return c.json({
     id: inserted!.id,
-    status: "pending",
+    status: "cancelled",
     amountCents,
     method,
-    balanceCents,
+    balanceCents: cancelWalletBalance.balanceCents,
+    bonusCents: cancelWalletBalance.bonusCents,
   });
 });
 
@@ -1165,8 +1181,8 @@ withdraw.post("/wallet/withdraw-requests/:id/cancel", requireDepositAuth, async 
     .set({ status: "cancelled", completedAt: new Date() })
     .where(eq(withdrawalRequests.id, id));
 
-  const balanceCents = await getBalanceCents(user.id, environment);
-  return c.json({ id, status: "cancelled", balanceCents });
+  const { balanceCents, bonusCents } = await getBalanceCents(user.id, environment);
+  return c.json({ id, status: "cancelled", balanceCents, bonusCents });
 });
 
 /** Public NatCash coords for deposit UI */

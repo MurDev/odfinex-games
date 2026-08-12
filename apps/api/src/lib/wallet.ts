@@ -17,10 +17,13 @@ export async function ensureWallet(
 export async function getBalanceCents(
   userId: string,
   environment: WalletEnvironment = "live",
-): Promise<number> {
+): Promise<{ balanceCents: number; bonusCents: number }> {
   await ensureWallet(userId, environment);
   const row = await db
-    .select({ balanceCents: walletAccounts.balanceCents })
+    .select({
+      balanceCents: walletAccounts.balanceCents,
+      bonusCents: walletAccounts.bonusCents,
+    })
     .from(walletAccounts)
     .where(
       and(
@@ -30,7 +33,11 @@ export async function getBalanceCents(
     )
     .limit(1)
     .then((rows) => rows[0]);
-  return row?.balanceCents ?? 0;
+
+  return {
+    balanceCents: row?.balanceCents ?? 0,
+    bonusCents: row?.bonusCents ?? 0,
+  };
 }
 
 type MutationInput = {
@@ -41,20 +48,38 @@ type MutationInput = {
   amountCents: number;
   reason: string;
   referenceId: string;
+  bonusCents?: number;
+  actorId?: string | null;
 };
 
 export type MutationResult =
-  | { ok: true; txId: string; balanceCents: number; replay: boolean }
+  | {
+      ok: true;
+      txId: string;
+      balanceCents: number;
+      bonusCents: number;
+      replay: boolean;
+    }
   | {
       ok: false;
-      code: "INSUFFICIENT_FUNDS" | "IDEMPOTENCY_CONFLICT";
+      code: "INSUFFICIENT_FUNDS" | "IDEMPOTENCY_CONFLICT" | "BONUS_INSUFFICIENT";
       message: string;
     };
 
 export async function applyLedgerMutation(
   input: MutationInput,
 ): Promise<MutationResult> {
-  const { userId, clientId, environment, type, amountCents, reason, referenceId } = input;
+  const {
+    userId,
+    clientId,
+    environment,
+    type,
+    amountCents,
+    reason,
+    referenceId,
+    bonusCents = 0,
+    actorId,
+  } = input;
 
   return db.transaction(async (tx) => {
     await tx
@@ -90,12 +115,16 @@ export async function applyLedgerMutation(
         ok: true as const,
         txId: existing.id,
         balanceCents: existing.balanceAfterCents,
+        bonusCents: existing.bonusCents,
         replay: true,
       };
     }
 
     const locked = await tx
-      .select({ balanceCents: walletAccounts.balanceCents })
+      .select({
+        balanceCents: walletAccounts.balanceCents,
+        bonusCents: walletAccounts.bonusCents,
+      })
       .from(walletAccounts)
       .where(
         and(
@@ -107,20 +136,46 @@ export async function applyLedgerMutation(
       .limit(1)
       .then((rows) => rows[0]);
 
-    const current = locked?.balanceCents ?? 0;
+    const currentBalance = locked?.balanceCents ?? 0;
+    const currentBonus = locked?.bonusCents ?? 0;
 
-    let next = current;
+    let nextBalance = currentBalance;
+    let nextBonus = currentBonus;
+    let entryBonusCents = 0;
+
     if (type === "debit") {
-      if (current < amountCents) {
+      const bonusToConsume = Math.min(currentBonus, amountCents);
+      const realDebit = amountCents - bonusToConsume;
+
+      if (currentBalance < realDebit) {
         return {
           ok: false as const,
           code: "INSUFFICIENT_FUNDS" as const,
           message: "Insufficient wallet balance",
         };
       }
-      next = current - amountCents;
+
+      nextBalance = currentBalance - realDebit;
+      nextBonus = currentBonus - bonusToConsume;
+      entryBonusCents = -bonusToConsume;
     } else {
-      next = current + amountCents;
+      nextBalance = currentBalance + amountCents;
+      const bonusDelta = Math.max(0, Math.min(bonusCents, amountCents));
+      nextBonus = currentBonus + bonusDelta;
+
+      if (nextBonus > nextBalance) {
+        nextBonus = nextBalance;
+      }
+
+      entryBonusCents = nextBonus - currentBonus;
+    }
+
+    if (nextBonus < 0 || nextBonus > nextBalance) {
+      return {
+        ok: false as const,
+        code: "BONUS_INSUFFICIENT" as const,
+        message: "Internal bonus invariant violation",
+      };
     }
 
     const inserted = await tx
@@ -131,7 +186,10 @@ export async function applyLedgerMutation(
         environment,
         type,
         amountCents,
-        balanceAfterCents: next,
+        balanceAfterCents: nextBalance,
+        bonusCents: entryBonusCents,
+        category: reason,
+        actorId: actorId ?? null,
         reason,
         referenceId,
       })
@@ -144,7 +202,11 @@ export async function applyLedgerMutation(
 
     await tx
       .update(walletAccounts)
-      .set({ balanceCents: next, updatedAt: new Date() })
+      .set({
+        balanceCents: nextBalance,
+        bonusCents: nextBonus,
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(walletAccounts.userId, userId),
@@ -155,7 +217,8 @@ export async function applyLedgerMutation(
     return {
       ok: true as const,
       txId: entry.id,
-      balanceCents: next,
+      balanceCents: nextBalance,
+      bonusCents: nextBonus,
       replay: false,
     };
   });

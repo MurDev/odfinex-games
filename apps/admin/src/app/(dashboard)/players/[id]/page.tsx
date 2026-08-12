@@ -25,6 +25,9 @@ type PlayerDetail = {
     type: string;
     amountCents: number;
     balanceAfterCents: number;
+    bonusCents: number;
+    category: string | null;
+    actorId: string | null;
     reason: string;
     clientId: string;
     environment: string;
@@ -116,6 +119,16 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Bonus</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatHtg(player.bonusCents)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Solde sandbox
             </CardTitle>
@@ -171,7 +184,10 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                   <TableHead>Type</TableHead>
                   <TableHead>Environnement</TableHead>
                   <TableHead>Montant</TableHead>
+                  <TableHead>Bonus</TableHead>
                   <TableHead>Solde apres</TableHead>
+                  <TableHead>Categorie</TableHead>
+                  <TableHead>Acteur</TableHead>
                   <TableHead>Motif</TableHead>
                   <TableHead>Jeu</TableHead>
                   <TableHead>Date</TableHead>
@@ -189,9 +205,12 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                       <Badge variant="outline">{tx.environment}</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">{formatHtg(tx.amountCents)}</TableCell>
+                    <TableCell className="font-mono text-sm">{formatHtg(tx.bonusCents)}</TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
                       {formatHtg(tx.balanceAfterCents)}
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{tx.category ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{tx.actorId ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{tx.reason}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {tx.clientId}
