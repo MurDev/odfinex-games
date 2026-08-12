@@ -6,6 +6,7 @@ import type { AdminGameStats } from "@odfinex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -25,6 +26,9 @@ export function GameSettings({ game }: GameSettingsProps) {
     launchUrl: game.launchUrl,
     isActive: game.isActive,
     walletEnabled: game.walletEnabled,
+    hidden: game.hidden,
+    notifyUrl: game.notifyUrl ?? "",
+    redirectUrls: game.redirectUrls.join("\n"),
   });
 
   async function handleSave() {
@@ -36,7 +40,18 @@ export function GameSettings({ game }: GameSettingsProps) {
       const res = await fetch(`/api/proxy/admin/games/${game.clientId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          name: form.name,
+          launchUrl: form.launchUrl,
+          isActive: form.isActive,
+          walletEnabled: form.walletEnabled,
+          hidden: form.hidden,
+          notifyUrl: form.notifyUrl.trim() || null,
+          redirectUrls: form.redirectUrls
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        }),
       });
 
       if (!res.ok) {
@@ -72,6 +87,28 @@ export function GameSettings({ game }: GameSettingsProps) {
           />
         </div>
 
+        <div className="space-y-2">
+          <Label>URLs de redirection (une par ligne)</Label>
+          <Textarea
+            rows={3}
+            placeholder="https://jeu.example/callback"
+            value={form.redirectUrls}
+            onChange={(e) => setForm((f) => ({ ...f, redirectUrls: e.target.value }))}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>URL de notification (webhook)</Label>
+          <Input
+            placeholder="https://jeu.example/webhooks"
+            value={form.notifyUrl}
+            onChange={(e) => setForm((f) => ({ ...f, notifyUrl: e.target.value }))}
+          />
+          <p className="text-xs text-muted-foreground">
+            Notifie le jeu lors des depots et retraits (file NatCash/MonCash).
+          </p>
+        </div>
+
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div>
             <p className="text-sm font-medium">Jeu actif</p>
@@ -80,6 +117,19 @@ export function GameSettings({ game }: GameSettingsProps) {
           <Switch
             checked={form.isActive}
             onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
+          />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div>
+            <p className="text-sm font-medium">Masque du catalogue</p>
+            <p className="text-xs text-muted-foreground">
+              Cacher le jeu de la liste publique (ex. jeux d&apos;entrainement)
+            </p>
+          </div>
+          <Switch
+            checked={form.hidden}
+            onCheckedChange={(v) => setForm((f) => ({ ...f, hidden: v }))}
           />
         </div>
 

@@ -16,9 +16,10 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Wallet, Calendar } from "lucide-react";
 import Link from "next/link";
+import { CreditDebitDialog } from "@/components/credit-debit-dialog";
 
 type PlayerDetail = {
-  player: AdminPlayer;
+  player: AdminPlayer & { sandboxBalanceCents: number };
   transactions: Array<{
     id: string;
     type: string;
@@ -26,6 +27,7 @@ type PlayerDetail = {
     balanceAfterCents: number;
     reason: string;
     clientId: string;
+    environment: string;
     referenceId: string;
     createdAt: string;
   }>;
@@ -75,16 +77,33 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
             {(player.displayName ?? player.email ?? "?").charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{player.displayName ?? "Anonyme"}</h1>
             {player.isAdmin && <Badge>Admin</Badge>}
+            {player.isBot && <Badge variant="secondary">Bot</Badge>}
           </div>
           <p className="text-sm text-muted-foreground">{player.email}</p>
         </div>
+        <div className="flex items-center gap-1">
+          <CreditDebitDialog
+            userId={player.id}
+            displayName={player.displayName}
+            email={player.email}
+            balanceCents={player.balanceCents}
+            direction="credit"
+          />
+          <CreditDebitDialog
+            userId={player.id}
+            displayName={player.displayName}
+            email={player.email}
+            balanceCents={player.balanceCents}
+            direction="debit"
+          />
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Solde</CardTitle>
@@ -92,6 +111,18 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatHtg(player.balanceCents)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Solde sandbox
+            </CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatHtg(player.sandboxBalanceCents)}</div>
           </CardContent>
         </Card>
 
@@ -138,6 +169,7 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
               <TableHeader>
                 <TableRow>
                   <TableHead>Type</TableHead>
+                  <TableHead>Environnement</TableHead>
                   <TableHead>Montant</TableHead>
                   <TableHead>Solde apres</TableHead>
                   <TableHead>Motif</TableHead>
@@ -152,6 +184,9 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                       <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
                         {tx.type === "credit" ? "Credit" : "Debit"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{tx.environment}</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">{formatHtg(tx.amountCents)}</TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">

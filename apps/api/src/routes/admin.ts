@@ -136,6 +136,9 @@ adminRoutes.get("/admin/games", requirePlatformSession, requireAdmin, async (c) 
         name: g.name,
         environment: g.environment as WalletEnvironment,
         launchUrl: g.launchUrl,
+        redirectUrls: g.redirectUrls,
+        notifyUrl: g.notifyUrl,
+        hidden: g.hidden,
         isActive: g.isActive,
         walletEnabled: g.walletEnabled,
         hasClientSecret: !!g.clientSecretHash,
@@ -185,6 +188,7 @@ adminRoutes.get("/admin/games/:clientId", requirePlatformSession, requireAdmin, 
     redirectUrls: game.redirectUrls,
     isActive: game.isActive,
     walletEnabled: game.walletEnabled,
+    hidden: game.hidden,
     notifyUrl: game.notifyUrl,
     hasClientSecret: !!game.clientSecretHash,
     createdAt: game.createdAt.toISOString(),
@@ -706,13 +710,24 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
   const gameFilter = c.req.query("game");
   const typeFilter = c.req.query("type");
   const playerFilter = c.req.query("player");
+  const search = c.req.query("search")?.trim() ?? "";
 
-  let conditions = undefined;
+  let conditions: SQL | undefined;
   if (gameFilter) conditions = and(conditions, eq(ledgerEntries.clientId, gameFilter));
   if (typeFilter && (typeFilter === "debit" || typeFilter === "credit")) {
     conditions = and(conditions, eq(ledgerEntries.type, typeFilter));
   }
   if (playerFilter) conditions = and(conditions, eq(ledgerEntries.userId, playerFilter));
+
+  if (search) {
+    const matched = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(or(ilike(users.email, `%${search}%`), ilike(users.name, `%${search}%`)))
+      .limit(50);
+    const ids = matched.map((u) => u.id);
+    conditions = and(conditions, inArray(ledgerEntries.userId, ids.length ? ids : ["__none__"]));
+  }
 
   const [totalRow] = await db
     .select({ count: sql<number>`count(*)::int` })

@@ -13,14 +13,22 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { AdminAccount } from "@odfinex/shared";
 
 type CreditDebitDialogProps = {
-  account: AdminAccount;
+  userId: string;
+  displayName?: string | null;
+  email?: string | null;
+  balanceCents: number;
   direction: "credit" | "debit";
 };
 
-export function CreditDebitDialog({ account, direction }: CreditDebitDialogProps) {
+export function CreditDebitDialog({
+  userId,
+  displayName,
+  email,
+  balanceCents,
+  direction,
+}: CreditDebitDialogProps) {
   const router = useRouter();
   const isCredit = direction === "credit";
   const [open, setOpen] = useState(false);
@@ -42,7 +50,7 @@ export function CreditDebitDialog({ account, direction }: CreditDebitDialogProps
     }
 
     try {
-      const res = await fetch(`/api/proxy/admin/users/${account.id}/${direction}`, {
+      const res = await fetch(`/api/proxy/admin/users/${userId}/${direction}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -83,10 +91,8 @@ export function CreditDebitDialog({ account, direction }: CreditDebitDialogProps
           <DialogHeader>
             <DialogTitle>{isCredit ? "Crediter" : "Debiter"} le compte</DialogTitle>
             <DialogDescription>
-              {account.displayName ?? account.email} (solde actuel{" "}
-              <span className="font-mono">
-                {(account.balanceCents / 100).toFixed(2)} HTG
-              </span>
+              {displayName ?? email} (solde actuel{" "}
+              <span className="font-mono">{(balanceCents / 100).toFixed(2)} HTG</span>
               )
             </DialogDescription>
           </DialogHeader>
