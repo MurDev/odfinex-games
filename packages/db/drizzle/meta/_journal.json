@@ -64,6 +64,13 @@
       "when": 1786397573375,
       "tag": "0008_bot_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786580573000,
+      "tag": "0009_credit_categories_bonus",
+      "breakpoints": true
     }
   ]
 }
