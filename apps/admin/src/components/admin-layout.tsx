@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -34,6 +34,7 @@ type NavItem = {
   label: string;
   href: string;
   icon: React.ElementType;
+  badge?: number;
 };
 
 type NavSection = {
@@ -41,35 +42,7 @@ type NavSection = {
   items: NavItem[];
 };
 
-const navSections: NavSection[] = [
-  {
-    title: "General",
-    items: [{ label: "Dashboard", href: "/", icon: LayoutDashboard }],
-  },
-  {
-    title: "Jeux",
-    items: [{ label: "Jeux", href: "/games", icon: Gamepad2 }],
-  },
-  {
-    title: "Comptes",
-    items: [
-      { label: "Joueurs", href: "/players", icon: Users },
-      { label: "Comptes & Bots", href: "/accounts", icon: Bot },
-    ],
-  },
-  {
-    title: "Activite",
-    items: [{ label: "Transactions", href: "/transactions", icon: ArrowLeftRight }],
-  },
-  {
-    title: "Finance",
-    items: [
-      { label: "Payment rails", href: "/payment-rails", icon: Landmark },
-      { label: "Depots NatCash", href: "/deposit-requests", icon: Inbox },
-      { label: "Retraits", href: "/withdrawal-requests", icon: Banknote },
-    ],
-  },
-];
+const SIDEBAR_STORAGE_KEY = "odfinex-admin-sidebar-open";
 
 type AdminLayoutProps = {
   children: React.ReactNode;
@@ -79,11 +52,61 @@ type AdminLayoutProps = {
     email?: string | null;
     avatarUrl?: string | null;
   };
+  pendingDeposits?: number;
+  pendingWithdrawals?: number;
 };
 
-export function AdminLayout({ children, user }: AdminLayoutProps) {
+export function AdminLayout({
+  children,
+  user,
+  pendingDeposits = 0,
+  pendingWithdrawals = 0,
+}: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const pathname = usePathname();
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (stored !== null) setSidebarOpen(stored === "true");
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarOpen((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+      return next;
+    });
+  }
+
+  const navSections: NavSection[] = [
+    {
+      title: "General",
+      items: [{ label: "Dashboard", href: "/", icon: LayoutDashboard }],
+    },
+    {
+      title: "Jeux",
+      items: [{ label: "Jeux", href: "/games", icon: Gamepad2 }],
+    },
+    {
+      title: "Comptes",
+      items: [
+        { label: "Joueurs", href: "/players", icon: Users },
+        { label: "Comptes & Bots", href: "/accounts", icon: Bot },
+      ],
+    },
+    {
+      title: "Activite",
+      items: [{ label: "Transactions", href: "/transactions", icon: ArrowLeftRight }],
+    },
+    {
+      title: "Finance",
+      items: [
+        { label: "Payment rails", href: "/payment-rails", icon: Landmark },
+        { label: "Depots NatCash", href: "/deposit-requests", icon: Inbox, badge: pendingDeposits },
+        { label: "Retraits", href: "/withdrawal-requests", icon: Banknote, badge: pendingWithdrawals },
+      ],
+    },
+  ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -103,7 +126,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSidebarOpen((p) => !p)}
+            onClick={toggleSidebar}
             className="hidden lg:inline-flex"
             aria-label="Toggle sidebar"
           >
@@ -129,14 +152,24 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                        "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                         isActive
                           ? "bg-primary/10 text-primary"
                           : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       )}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
-                      {sidebarOpen && <span>{item.label}</span>}
+                      {sidebarOpen && <span className="flex-1">{item.label}</span>}
+                      {!!item.badge && (
+                        <span
+                          className={cn(
+                            "flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[0.7rem] font-semibold text-primary-foreground",
+                            !sidebarOpen && "absolute right-1 top-1 h-4 min-w-4 text-[0.6rem]",
+                          )}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -158,7 +191,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSidebarOpen((p) => !p)}
+            onClick={toggleSidebar}
             className="lg:hidden"
             aria-label="Toggle menu"
           >

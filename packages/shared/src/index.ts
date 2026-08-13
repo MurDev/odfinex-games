@@ -408,6 +408,87 @@ export const AdminAccountSchema = z.object({
 
 export type AdminAccount = z.infer<typeof AdminAccountSchema>;
 
+export const AdminDepositRequestSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  displayName: z.string().nullable(),
+  email: z.string().nullable(),
+  amountCents: z.number().int().nonnegative(),
+  status: z.enum(["pending", "approved", "rejected", "cancelled"]),
+  paymentProofUrl: z.string().nullable(),
+  reference: z.string().nullable(),
+  adminComment: z.string().nullable(),
+  clientId: z.string().nullable(),
+  gameName: z.string().nullable(),
+  environment: WalletEnvironmentSchema,
+  reviewedBy: z.string().nullable(),
+  reviewedByName: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  isSelf: z.boolean().optional(),
+});
+
+export type AdminDepositRequest = z.infer<typeof AdminDepositRequestSchema>;
+
+export const AdminDepositRequestDetailSchema = z.object({
+  request: AdminDepositRequestSchema,
+  ledgerEntry: z
+    .object({
+      id: z.string(),
+      amountCents: z.number(),
+      balanceAfterCents: z.number(),
+      referenceId: z.string(),
+      createdAt: z.string(),
+    })
+    .nullable(),
+});
+
+export type AdminDepositRequestDetail = z.infer<typeof AdminDepositRequestDetailSchema>;
+
+export const AdminWithdrawalRequestSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  displayName: z.string().nullable(),
+  email: z.string().nullable(),
+  amountCents: z.number().int().nonnegative(),
+  method: z.string(),
+  account: z.string(),
+  accountName: z.string().nullable(),
+  status: z.enum(["pending", "processing", "successful", "failed", "cancelled"]),
+  adminComment: z.string().nullable(),
+  clientId: z.string().nullable(),
+  gameName: z.string().nullable(),
+  environment: WalletEnvironmentSchema,
+  referenceId: z.string(),
+  providerTxId: z.string().nullable(),
+  reviewedBy: z.string().nullable(),
+  reviewedByName: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+  isSelf: z.boolean().optional(),
+});
+
+export type AdminWithdrawalRequest = z.infer<typeof AdminWithdrawalRequestSchema>;
+
+export const AdminWithdrawalRequestDetailSchema = z.object({
+  request: AdminWithdrawalRequestSchema,
+  ledgerEntries: z.array(
+    z.object({
+      id: z.string(),
+      type: z.string(),
+      amountCents: z.number(),
+      balanceAfterCents: z.number(),
+      reason: z.string(),
+      referenceId: z.string(),
+      createdAt: z.string(),
+    }),
+  ),
+});
+
+export type AdminWithdrawalRequestDetail = z.infer<typeof AdminWithdrawalRequestDetailSchema>;
+
 export const ClientBalancesRequestSchema = z.object({
   userIds: z.array(z.string().min(1).max(128)).max(200),
 });

@@ -4,6 +4,8 @@ import { db } from "@/auth";
 import { eq } from "drizzle-orm";
 import { users } from "@odfinex/db";
 import { AdminLayout } from "@/components/admin-layout";
+import { adminServerFetch } from "@/lib/server-fetch";
+import type { AdminStats } from "@odfinex/shared";
 
 export default async function DashboardLayout({
   children,
@@ -35,6 +37,13 @@ export default async function DashboardLayout({
     );
   }
 
+  let stats: AdminStats | null = null;
+  try {
+    stats = await adminServerFetch<AdminStats>("/admin/stats");
+  } catch {
+    stats = null;
+  }
+
   return (
     <AdminLayout
       user={{
@@ -43,6 +52,8 @@ export default async function DashboardLayout({
         email: session.user.email,
         avatarUrl: session.user.image,
       }}
+      pendingDeposits={stats?.pendingDeposits ?? 0}
+      pendingWithdrawals={stats?.pendingWithdrawals ?? 0}
     >
       {children}
     </AdminLayout>

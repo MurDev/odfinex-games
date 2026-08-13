@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Save } from "lucide-react";
 
 type Rail = {
@@ -113,7 +114,10 @@ export default function PaymentRailsPage() {
       {success && <p className="text-sm text-emerald-400">{success}</p>}
 
       {loading ? (
-        <p className="text-muted-foreground">Chargement…</p>
+        <div className="space-y-4">
+          <Skeleton className="h-40 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
+        </div>
       ) : rails.length === 0 ? (
         <p className="text-muted-foreground">Aucune config (lancez la migration 0006).</p>
       ) : (

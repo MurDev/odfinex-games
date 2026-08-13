@@ -147,7 +147,7 @@ export default async function AccountsPage({
                           direction="debit"
                         />
                         <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/players/${account.id}`}>
+                          <Link href={`/accounts/${account.id}`}>
                             <ExternalLink className="mr-1 h-3 w-3" />
                             Voir
                           </Link>

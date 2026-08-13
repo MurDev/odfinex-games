@@ -438,6 +438,15 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
 
   if (!user) return apiError(c, 404, "NOT_FOUND", "Player not found");
 
+  const gameName = user.clientId
+    ? await db
+        .select({ name: gameClients.name })
+        .from(gameClients)
+        .where(eq(gameClients.clientId, user.clientId))
+        .limit(1)
+        .then((rows) => rows[0]?.name ?? null)
+    : null;
+
   const walletRows = await db
     .select({
       balanceCents: walletAccounts.balanceCents,
@@ -474,6 +483,8 @@ adminRoutes.get("/admin/players/:id", requirePlatformSession, requireAdmin, asyn
       avatarUrl: user.image,
       isAdmin: user.isAdmin ?? false,
       isBot: user.isBot ?? false,
+      clientId: user.clientId,
+      gameName,
       createdAt: user.createdAt.toISOString(),
       balanceCents: live,
       sandboxBalanceCents: sandbox,
@@ -944,6 +955,20 @@ adminRoutes.get("/admin/deposit-requests", requirePlatformSession, requireAdmin,
     .from(manualDepositRequests)
     .where(whereClause);
 
+  const reviewerNameListSub = db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, manualDepositRequests.reviewedBy))
+    .limit(1);
+  const reviewedByNameList = sql<string | null>`${reviewerNameListSub}`;
+
+  const gameNameListSub = db
+    .select({ name: gameClients.name })
+    .from(gameClients)
+    .where(eq(gameClients.clientId, manualDepositRequests.clientId))
+    .limit(1);
+  const gameNameList = sql<string | null>`${gameNameListSub}`;
+
   const items = await db
     .select({
       id: manualDepositRequests.id,
@@ -955,10 +980,14 @@ adminRoutes.get("/admin/deposit-requests", requirePlatformSession, requireAdmin,
       adminComment: manualDepositRequests.adminComment,
       clientId: manualDepositRequests.clientId,
       environment: manualDepositRequests.environment,
+      reviewedBy: manualDepositRequests.reviewedBy,
+      reviewedAt: manualDepositRequests.reviewedAt,
       createdAt: manualDepositRequests.createdAt,
       updatedAt: manualDepositRequests.updatedAt,
       displayName: users.name,
       email: users.email,
+      gameName: gameNameList,
+      reviewedByName: reviewedByNameList,
     })
     .from(manualDepositRequests)
     .leftJoin(users, eq(manualDepositRequests.userId, users.id))
@@ -971,12 +1000,91 @@ adminRoutes.get("/admin/deposit-requests", requirePlatformSession, requireAdmin,
     items: items.map((r) => ({
       ...r,
       isSelf: r.userId === admin.id,
+      reviewedAt: r.reviewedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     })),
     total: totalRow?.count ?? 0,
   });
 });
+
+adminRoutes.get(
+  "/admin/deposit-requests/:id",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const admin = c.get("user");
+    const id = c.req.param("id");
+
+    const reviewerNameSub = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, manualDepositRequests.reviewedBy))
+      .limit(1);
+    const reviewedByName = sql<string | null>`${reviewerNameSub}`;
+
+    const gameNameSub = db
+      .select({ name: gameClients.name })
+      .from(gameClients)
+      .where(eq(gameClients.clientId, manualDepositRequests.clientId))
+      .limit(1);
+    const gameName = sql<string | null>`${gameNameSub}`;
+
+    const row = await db
+      .select({
+        id: manualDepositRequests.id,
+        userId: manualDepositRequests.userId,
+        amountCents: manualDepositRequests.amountCents,
+        status: manualDepositRequests.status,
+        paymentProofUrl: manualDepositRequests.paymentProofUrl,
+        reference: manualDepositRequests.reference,
+        adminComment: manualDepositRequests.adminComment,
+        clientId: manualDepositRequests.clientId,
+        environment: manualDepositRequests.environment,
+        reviewedBy: manualDepositRequests.reviewedBy,
+        reviewedAt: manualDepositRequests.reviewedAt,
+        createdAt: manualDepositRequests.createdAt,
+        updatedAt: manualDepositRequests.updatedAt,
+        displayName: users.name,
+        email: users.email,
+        gameName,
+        reviewedByName,
+      })
+      .from(manualDepositRequests)
+      .leftJoin(users, eq(manualDepositRequests.userId, users.id))
+      .where(eq(manualDepositRequests.id, id))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!row) return apiError(c, 404, "NOT_FOUND", "Deposit request not found");
+
+    const ledgerEntry = await db
+      .select({
+        id: ledgerEntries.id,
+        amountCents: ledgerEntries.amountCents,
+        balanceAfterCents: ledgerEntries.balanceAfterCents,
+        referenceId: ledgerEntries.referenceId,
+        createdAt: ledgerEntries.createdAt,
+      })
+      .from(ledgerEntries)
+      .where(eq(ledgerEntries.referenceId, `mdep_${row.id}`))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    return c.json({
+      request: {
+        ...row,
+        reviewedAt: row.reviewedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+        isSelf: row.userId === admin.id,
+      },
+      ledgerEntry: ledgerEntry
+        ? { ...ledgerEntry, createdAt: ledgerEntry.createdAt.toISOString() }
+        : null,
+    });
+  },
+);
 
 adminRoutes.post(
   "/admin/deposit-requests/:id/approve",
@@ -1102,6 +1210,20 @@ adminRoutes.get("/admin/withdrawal-requests", requirePlatformSession, requireAdm
     .from(withdrawalRequests)
     .where(whereClause);
 
+  const reviewerNameListSub = db
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, withdrawalRequests.reviewedBy))
+    .limit(1);
+  const reviewedByNameList = sql<string | null>`${reviewerNameListSub}`;
+
+  const gameNameListSub = db
+    .select({ name: gameClients.name })
+    .from(gameClients)
+    .where(eq(gameClients.clientId, withdrawalRequests.clientId))
+    .limit(1);
+  const gameNameList = sql<string | null>`${gameNameListSub}`;
+
   const items = await db
     .select({
       id: withdrawalRequests.id,
@@ -1115,10 +1237,16 @@ adminRoutes.get("/admin/withdrawal-requests", requirePlatformSession, requireAdm
       adminComment: withdrawalRequests.adminComment,
       clientId: withdrawalRequests.clientId,
       environment: withdrawalRequests.environment,
+      referenceId: withdrawalRequests.referenceId,
+      providerTxId: withdrawalRequests.providerTxId,
+      reviewedBy: withdrawalRequests.reviewedBy,
+      reviewedAt: withdrawalRequests.reviewedAt,
       createdAt: withdrawalRequests.createdAt,
       completedAt: withdrawalRequests.completedAt,
       displayName: users.name,
       email: users.email,
+      gameName: gameNameList,
+      reviewedByName: reviewedByNameList,
     })
     .from(withdrawalRequests)
     .leftJoin(users, eq(withdrawalRequests.userId, users.id))
@@ -1132,12 +1260,101 @@ adminRoutes.get("/admin/withdrawal-requests", requirePlatformSession, requireAdm
       ...r,
       isSelf: r.userId === admin.id,
       account: r.account || r.phone,
+      reviewedAt: r.reviewedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
       completedAt: r.completedAt?.toISOString() ?? null,
     })),
     total: totalRow?.count ?? 0,
   });
 });
+
+adminRoutes.get(
+  "/admin/withdrawal-requests/:id",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const admin = c.get("user");
+    const id = c.req.param("id");
+
+    const reviewerNameSub = db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, withdrawalRequests.reviewedBy))
+      .limit(1);
+    const reviewedByName = sql<string | null>`${reviewerNameSub}`;
+
+    const gameNameSub = db
+      .select({ name: gameClients.name })
+      .from(gameClients)
+      .where(eq(gameClients.clientId, withdrawalRequests.clientId))
+      .limit(1);
+    const gameName = sql<string | null>`${gameNameSub}`;
+
+    const row = await db
+      .select({
+        id: withdrawalRequests.id,
+        userId: withdrawalRequests.userId,
+        amountCents: withdrawalRequests.amountCents,
+        method: withdrawalRequests.method,
+        account: withdrawalRequests.account,
+        accountName: withdrawalRequests.accountName,
+        phone: withdrawalRequests.phone,
+        status: withdrawalRequests.status,
+        adminComment: withdrawalRequests.adminComment,
+        clientId: withdrawalRequests.clientId,
+        environment: withdrawalRequests.environment,
+        referenceId: withdrawalRequests.referenceId,
+        providerTxId: withdrawalRequests.providerTxId,
+        reviewedBy: withdrawalRequests.reviewedBy,
+        reviewedAt: withdrawalRequests.reviewedAt,
+        createdAt: withdrawalRequests.createdAt,
+        completedAt: withdrawalRequests.completedAt,
+        displayName: users.name,
+        email: users.email,
+        gameName,
+        reviewedByName,
+      })
+      .from(withdrawalRequests)
+      .leftJoin(users, eq(withdrawalRequests.userId, users.id))
+      .where(or(eq(withdrawalRequests.id, id), eq(withdrawalRequests.referenceId, id)))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+
+    if (!row) return apiError(c, 404, "NOT_FOUND", "Withdrawal request not found");
+
+    const ledgerRows = await db
+      .select({
+        id: ledgerEntries.id,
+        type: ledgerEntries.type,
+        amountCents: ledgerEntries.amountCents,
+        balanceAfterCents: ledgerEntries.balanceAfterCents,
+        reason: ledgerEntries.reason,
+        referenceId: ledgerEntries.referenceId,
+        createdAt: ledgerEntries.createdAt,
+      })
+      .from(ledgerEntries)
+      .where(
+        inArray(ledgerEntries.referenceId, [
+          row.referenceId,
+          `refund_${row.referenceId}`,
+          `reject_${row.referenceId}`,
+        ]),
+      )
+      .orderBy(asc(ledgerEntries.createdAt));
+
+    return c.json({
+      request: {
+        ...row,
+        account: row.account || row.phone,
+        reviewedAt: row.reviewedAt?.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        completedAt: row.completedAt?.toISOString() ?? null,
+        isSelf: row.userId === admin.id,
+      },
+      ledgerEntries: ledgerRows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })),
+    });
+  },
+);
 
 adminRoutes.post(
   "/admin/withdrawal-requests/:id/approve",
