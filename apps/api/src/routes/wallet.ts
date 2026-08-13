@@ -1209,6 +1209,7 @@ withdraw.get("/wallet/withdraw-requests", requireDepositAuth, async (c) => {
   const user = c.get("user");
   const environment = c.get("environment");
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
+  const status = c.req.query("status");
 
   const items = await db
     .select()
@@ -1217,6 +1218,7 @@ withdraw.get("/wallet/withdraw-requests", requireDepositAuth, async (c) => {
       and(
         eq(withdrawalRequests.userId, user.id),
         eq(withdrawalRequests.environment, environment),
+        status ? eq(withdrawalRequests.status, status) : undefined,
       ),
     )
     .orderBy(desc(withdrawalRequests.createdAt))
@@ -1389,6 +1391,7 @@ withdraw.get("/wallet/deposit-requests", requireDepositAuth, async (c) => {
   const user = c.get("user");
   const environment = c.get("environment");
   const limit = Math.min(Number(c.req.query("limit") ?? 20) || 20, 50);
+  const status = c.req.query("status");
 
   const items = await db
     .select()
@@ -1397,6 +1400,7 @@ withdraw.get("/wallet/deposit-requests", requireDepositAuth, async (c) => {
       and(
         eq(manualDepositRequests.userId, user.id),
         eq(manualDepositRequests.environment, environment),
+        status ? eq(manualDepositRequests.status, status) : undefined,
       ),
     )
     .orderBy(desc(manualDepositRequests.createdAt))
