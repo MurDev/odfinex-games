@@ -808,6 +808,7 @@ s2s.get("/client/payment-rails", requireS2SClientAuth, async (c) => {
     items: rails.map((r) => ({
       method: r.method,
       enabled: r.enabled,
+      withdrawalEnabled: r.withdrawalEnabled,
       accountName: r.accountName,
       accountNumber: r.accountNumber,
       minAmountCents: r.minAmountCents,
@@ -1081,6 +1082,22 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
     }
   } else {
     return apiError(c, 400, "METHOD_NOT_SUPPORTED", "Unsupported withdraw method");
+  }
+
+  const withdrawRail = await db
+    .select()
+    .from(paymentRailConfigs)
+    .where(
+      and(
+        eq(paymentRailConfigs.method, method),
+        eq(paymentRailConfigs.environment, environment),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!withdrawRail?.withdrawalEnabled) {
+    return apiError(c, 400, "METHOD_DISABLED", `${method} withdrawals are not enabled`);
   }
 
   const amountHtg = parsed.data.amountHtg;

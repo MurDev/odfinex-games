@@ -220,6 +220,8 @@ export const paymentRailConfigs = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     method: text("method").notNull(), // natcash
     enabled: boolean("enabled").notNull().default(false),
+    /** Independent from `enabled` (deposit): a rail can be open for deposits but closed for withdrawals, or vice versa. */
+    withdrawalEnabled: boolean("withdrawal_enabled").notNull().default(true),
     accountName: text("account_name").notNull().default(""),
     accountNumber: text("account_number").notNull().default(""),
     minAmountCents: integer("min_amount_cents").notNull().default(1000),

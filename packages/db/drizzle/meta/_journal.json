@@ -78,6 +78,13 @@
       "when": 1786680000000,
       "tag": "0010_moncash_rail_config",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786633285685,
+      "tag": "0011_opposite_secret_warriors",
+      "breakpoints": true
     }
   ]
 }

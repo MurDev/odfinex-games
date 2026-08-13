@@ -835,6 +835,7 @@ adminRoutes.get("/admin/payment-rails", requirePlatformSession, requireAdmin, as
       id: r.id,
       method: r.method,
       enabled: r.enabled,
+      withdrawalEnabled: r.withdrawalEnabled,
       accountName: r.accountName,
       accountNumber: r.accountNumber,
       minAmountCents: r.minAmountCents,
@@ -859,6 +860,8 @@ adminRoutes.patch("/admin/payment-rails/:id", requirePlatformSession, requireAdm
 
   const enabled =
     typeof body.enabled === "boolean" ? body.enabled : existing.enabled;
+  const withdrawalEnabled =
+    typeof body.withdrawalEnabled === "boolean" ? body.withdrawalEnabled : existing.withdrawalEnabled;
   const accountName =
     typeof body.accountName === "string" ? body.accountName.trim() : existing.accountName;
   const accountNumber =
@@ -895,6 +898,7 @@ adminRoutes.patch("/admin/payment-rails/:id", requirePlatformSession, requireAdm
     .update(paymentRailConfigs)
     .set({
       enabled,
+      withdrawalEnabled,
       accountName,
       accountNumber,
       minAmountCents,

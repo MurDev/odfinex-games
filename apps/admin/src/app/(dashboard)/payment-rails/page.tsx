@@ -12,6 +12,7 @@ type Rail = {
   id: string;
   method: string;
   enabled: boolean;
+  withdrawalEnabled: boolean;
   accountName: string;
   accountNumber: string;
   minAmountCents: number;
@@ -58,6 +59,7 @@ export default function PaymentRailsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           enabled: rail.enabled,
+          withdrawalEnabled: rail.withdrawalEnabled,
           accountName: rail.accountName,
           accountNumber: rail.accountNumber,
           minAmountCents: rail.minAmountCents,
@@ -82,7 +84,7 @@ export default function PaymentRailsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment rails</h1>
           <p className="text-sm text-muted-foreground">
-            Active/desactive chaque methode de depot vue par les jeux clients
+            Active/desactive chaque methode, separement pour le depot et le retrait, vue par les jeux clients
           </p>
         </div>
         <div className="flex gap-2">
@@ -119,7 +121,7 @@ export default function PaymentRailsPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between rounded-lg border p-3">
                 <div>
-                  <p className="text-sm font-medium">Active</p>
+                  <p className="text-sm font-medium">Actif pour depot</p>
                   <p className="text-xs text-muted-foreground">Visible aux joueurs pour depot</p>
                 </div>
                 <Switch
@@ -127,6 +129,20 @@ export default function PaymentRailsPage() {
                   onCheckedChange={(v) =>
                     setRails((all) =>
                       all.map((r) => (r.id === rail.id ? { ...r, enabled: v } : r)),
+                    )
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="text-sm font-medium">Actif pour retrait</p>
+                  <p className="text-xs text-muted-foreground">Visible aux joueurs pour retrait</p>
+                </div>
+                <Switch
+                  checked={rail.withdrawalEnabled}
+                  onCheckedChange={(v) =>
+                    setRails((all) =>
+                      all.map((r) => (r.id === rail.id ? { ...r, withdrawalEnabled: v } : r)),
                     )
                   }
                 />
