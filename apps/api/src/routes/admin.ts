@@ -351,17 +351,23 @@ adminRoutes.get("/admin/players", requirePlatformSession, requireAdmin, async (c
     conditions = and(conditions, eq(users.isAdmin, false));
   }
 
-  const liveBalance = db
-    .select({
-      balance: walletAccounts.balanceCents,
-      bonus: walletAccounts.bonusCents,
-    })
+  const liveBalanceCondition = and(
+    eq(walletAccounts.userId, users.id),
+    eq(walletAccounts.environment, "live"),
+  );
+  const balanceSub = db
+    .select({ v: walletAccounts.balanceCents })
     .from(walletAccounts)
-    .where(and(eq(walletAccounts.userId, users.id), eq(walletAccounts.environment, "live")))
+    .where(liveBalanceCondition)
+    .limit(1);
+  const bonusSub = db
+    .select({ v: walletAccounts.bonusCents })
+    .from(walletAccounts)
+    .where(liveBalanceCondition)
     .limit(1);
 
-  const balanceCents = sql<number>`${liveBalance}`;
-  const bonusCents = sql<number>`coalesce(${liveBalance}.bonus, 0)`;
+  const balanceCents = sql<number>`coalesce(${balanceSub}, 0)`;
+  const bonusCents = sql<number>`coalesce(${bonusSub}, 0)`;
   const transactionCount = db.$count(ledgerEntries, eq(ledgerEntries.userId, users.id));
 
   const orderBy: SQL =
@@ -507,13 +513,22 @@ adminRoutes.get("/admin/accounts", requirePlatformSession, requireAdmin, async (
     conditions = and(conditions, eq(users.clientId, game));
   }
 
-  const liveBalance = db
-    .select({ balance: walletAccounts.balanceCents, bonus: walletAccounts.bonusCents })
+  const liveBalanceCondition = and(
+    eq(walletAccounts.userId, users.id),
+    eq(walletAccounts.environment, "live"),
+  );
+  const balanceSub = db
+    .select({ v: walletAccounts.balanceCents })
     .from(walletAccounts)
-    .where(and(eq(walletAccounts.userId, users.id), eq(walletAccounts.environment, "live")))
+    .where(liveBalanceCondition)
     .limit(1);
-  const balanceCents = sql<number>`${liveBalance}`;
-  const bonusCents = sql<number>`coalesce(${liveBalance}.bonus, 0)`;
+  const bonusSub = db
+    .select({ v: walletAccounts.bonusCents })
+    .from(walletAccounts)
+    .where(liveBalanceCondition)
+    .limit(1);
+  const balanceCents = sql<number>`coalesce(${balanceSub}, 0)`;
+  const bonusCents = sql<number>`coalesce(${bonusSub}, 0)`;
   const transactionCount = db.$count(ledgerEntries, eq(ledgerEntries.userId, users.id));
   const ownerGame = db
     .select({ name: gameClients.name })
