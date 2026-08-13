@@ -82,7 +82,7 @@ export default function PaymentRailsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Payment rails</h1>
           <p className="text-sm text-muted-foreground">
-            Coordonnees NatCash pour les depots manuels
+            Active/desactive chaque methode de depot vue par les jeux clients
           </p>
         </div>
         <div className="flex gap-2">
@@ -131,79 +131,83 @@ export default function PaymentRailsPage() {
                   }
                 />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              {rail.method === "natcash" && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Nom du compte</Label>
+                    <Input
+                      value={rail.accountName}
+                      onChange={(e) =>
+                        setRails((all) =>
+                          all.map((r) =>
+                            r.id === rail.id ? { ...r, accountName: e.target.value } : r,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Numero de compte</Label>
+                    <Input
+                      value={rail.accountNumber}
+                      onChange={(e) =>
+                        setRails((all) =>
+                          all.map((r) =>
+                            r.id === rail.id ? { ...r, accountNumber: e.target.value } : r,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min (HTG)</Label>
+                    <Input
+                      type="number"
+                      value={rail.minAmountCents / 100}
+                      onChange={(e) =>
+                        setRails((all) =>
+                          all.map((r) =>
+                            r.id === rail.id
+                              ? { ...r, minAmountCents: Math.round(Number(e.target.value) * 100) }
+                              : r,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Max (HTG)</Label>
+                    <Input
+                      type="number"
+                      value={rail.maxAmountCents / 100}
+                      onChange={(e) =>
+                        setRails((all) =>
+                          all.map((r) =>
+                            r.id === rail.id
+                              ? { ...r, maxAmountCents: Math.round(Number(e.target.value) * 100) }
+                              : r,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+              {rail.method === "natcash" && (
                 <div className="space-y-2">
-                  <Label>Nom du compte</Label>
+                  <Label>Instructions</Label>
                   <Input
-                    value={rail.accountName}
+                    value={rail.instructions ?? ""}
                     onChange={(e) =>
                       setRails((all) =>
                         all.map((r) =>
-                          r.id === rail.id ? { ...r, accountName: e.target.value } : r,
+                          r.id === rail.id ? { ...r, instructions: e.target.value } : r,
                         ),
                       )
                     }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Numero de compte</Label>
-                  <Input
-                    value={rail.accountNumber}
-                    onChange={(e) =>
-                      setRails((all) =>
-                        all.map((r) =>
-                          r.id === rail.id ? { ...r, accountNumber: e.target.value } : r,
-                        ),
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Min (HTG)</Label>
-                  <Input
-                    type="number"
-                    value={rail.minAmountCents / 100}
-                    onChange={(e) =>
-                      setRails((all) =>
-                        all.map((r) =>
-                          r.id === rail.id
-                            ? { ...r, minAmountCents: Math.round(Number(e.target.value) * 100) }
-                            : r,
-                        ),
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Max (HTG)</Label>
-                  <Input
-                    type="number"
-                    value={rail.maxAmountCents / 100}
-                    onChange={(e) =>
-                      setRails((all) =>
-                        all.map((r) =>
-                          r.id === rail.id
-                            ? { ...r, maxAmountCents: Math.round(Number(e.target.value) * 100) }
-                            : r,
-                        ),
-                      )
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Instructions</Label>
-                <Input
-                  value={rail.instructions ?? ""}
-                  onChange={(e) =>
-                    setRails((all) =>
-                      all.map((r) =>
-                        r.id === rail.id ? { ...r, instructions: e.target.value } : r,
-                      ),
-                    )
-                  }
-                />
-              </div>
+              )}
               <Button onClick={() => void save(rail)} disabled={saving === rail.id}>
                 {saving === rail.id ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

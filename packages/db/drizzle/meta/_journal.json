@@ -71,6 +71,13 @@
       "when": 1786580573000,
       "tag": "0009_credit_categories_bonus",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786680000000,
+      "tag": "0010_moncash_rail_config",
+      "breakpoints": true
     }
   ]
 }

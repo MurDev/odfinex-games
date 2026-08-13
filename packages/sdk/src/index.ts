@@ -530,7 +530,7 @@ export class OdfinexGamesClient {
 
   async getPaymentRails(): Promise<{
     items: Array<{
-      method: "natcash";
+      method: string;
       enabled: boolean;
       accountName: string;
       accountNumber: string;
@@ -552,7 +552,7 @@ export class OdfinexGamesClient {
     }
     return (await res.json()) as {
       items: Array<{
-        method: "natcash";
+        method: string;
         enabled: boolean;
         accountName: string;
         accountNumber: string;
