@@ -821,7 +821,7 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
   });
 });
 
-/* ── Payment rails (NatCash config) ── */
+/* ── Payment rails (per-method enable/config, e.g. NatCash, MonCash) ── */
 
 adminRoutes.get("/admin/payment-rails", requirePlatformSession, requireAdmin, async (c) => {
   const environment = (c.req.query("environment") === "sandbox" ? "sandbox" : "live") as WalletEnvironment;
@@ -880,7 +880,9 @@ adminRoutes.patch("/admin/payment-rails/:id", requirePlatformSession, requireAdm
   const instructions =
     typeof body.instructions === "string" ? body.instructions : existing.instructions;
 
-  if (enabled && (!accountName || !accountNumber)) {
+  // Only manual/proof-based rails (NatCash) need a fixed destination account —
+  // MonCash is the automated Bazik rail, no admin-configured account involved.
+  if (existing.method === "natcash" && enabled && (!accountName || !accountNumber)) {
     return apiError(
       c,
       400,

@@ -1104,14 +1104,14 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
     })
     .returning();
 
-  const cancelWalletBalance = await getBalanceCents(user.id, environment);
+  const createdWalletBalance = await getBalanceCents(user.id, environment);
   return c.json({
     id: inserted!.id,
-    status: "cancelled",
+    status: "pending",
     amountCents,
     method,
-    balanceCents: cancelWalletBalance.balanceCents,
-    bonusCents: cancelWalletBalance.bonusCents,
+    balanceCents: createdWalletBalance.balanceCents,
+    bonusCents: createdWalletBalance.bonusCents,
   });
 });
 
@@ -1185,7 +1185,7 @@ withdraw.post("/wallet/withdraw-requests/:id/cancel", requireDepositAuth, async 
   return c.json({ id, status: "cancelled", balanceCents, bonusCents });
 });
 
-/** Public NatCash coords for deposit UI */
+/** Public payment-rail catalog for deposit UI — every configured method, not just NatCash. */
 withdraw.get("/wallet/payment-rails", requireDepositAuth, async (c) => {
   const environment = c.get("environment");
   const rails = await db
@@ -1195,9 +1195,9 @@ withdraw.get("/wallet/payment-rails", requireDepositAuth, async (c) => {
 
   return c.json({
     items: rails
-      .filter((r) => r.enabled && r.method === "natcash")
+      .filter((r) => r.enabled)
       .map((r) => ({
-        method: "natcash" as const,
+        method: r.method,
         enabled: r.enabled,
         accountName: r.accountName,
         accountNumber: r.accountNumber,
