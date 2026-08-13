@@ -61,9 +61,6 @@ type PlatformEnv = { Variables: AuthVariables };
 type S2SEnv = { Variables: S2SClientVariables };
 type DepositEnv = { Variables: DepositAuthVariables };
 
-const MIN_HTG = 10;
-const MAX_HTG = 75_000;
-
 function normalizePhone(phone: string): string {
   return phone.replace(/[\s\-]/g, "");
 }
@@ -932,7 +929,7 @@ deposit.post("/wallet/deposit", requireDepositAuth, async (c) => {
       c,
       400,
       "INVALID_BODY",
-      `Invalid deposit (amount ${MIN_HTG}–${MAX_HTG} HTG, method moncash)`,
+      "Invalid deposit (amount must be a positive integer HTG, method moncash)",
     );
   }
 
@@ -1082,7 +1079,7 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
       c,
       400,
       "INVALID_BODY",
-      `Invalid withdraw (amount ${MIN_HTG}–${MAX_HTG} HTG, method + account required)`,
+      "Invalid withdraw (amount must be a positive integer HTG, method + account required)",
     );
   }
 
