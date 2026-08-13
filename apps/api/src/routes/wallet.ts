@@ -796,6 +796,27 @@ s2s.get("/client/withdrawal-requests", requireS2SClientAuth, async (c) => {
   });
 });
 
+/** S2S read-only: full rail catalog for this game's environment, including disabled rails. */
+s2s.get("/client/payment-rails", requireS2SClientAuth, async (c) => {
+  const environment = c.get("environment");
+  const rails = await db
+    .select()
+    .from(paymentRailConfigs)
+    .where(eq(paymentRailConfigs.environment, environment));
+
+  return c.json({
+    items: rails.map((r) => ({
+      method: r.method,
+      enabled: r.enabled,
+      accountName: r.accountName,
+      accountNumber: r.accountNumber,
+      minAmountCents: r.minAmountCents,
+      maxAmountCents: r.maxAmountCents,
+      instructions: r.instructions,
+    })),
+  });
+});
+
 walletRoutes.route("/", s2s);
 
 const player = new Hono<PlatformEnv>();
