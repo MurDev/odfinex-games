@@ -61,9 +61,6 @@ type PlatformEnv = { Variables: AuthVariables };
 type S2SEnv = { Variables: S2SClientVariables };
 type DepositEnv = { Variables: DepositAuthVariables };
 
-const MIN_HTG = 10;
-const MAX_HTG = 75_000;
-
 function normalizePhone(phone: string): string {
   return phone.replace(/[\s\-]/g, "");
 }
@@ -811,8 +808,10 @@ s2s.get("/client/payment-rails", requireS2SClientAuth, async (c) => {
       withdrawalEnabled: r.withdrawalEnabled,
       accountName: r.accountName,
       accountNumber: r.accountNumber,
-      minAmountCents: r.minAmountCents,
-      maxAmountCents: r.maxAmountCents,
+      depositMinAmountCents: r.depositMinAmountCents,
+      depositMaxAmountCents: r.depositMaxAmountCents,
+      withdrawalMinAmountCents: r.withdrawalMinAmountCents,
+      withdrawalMaxAmountCents: r.withdrawalMaxAmountCents,
       instructions: r.instructions,
     })),
   });
@@ -930,7 +929,7 @@ deposit.post("/wallet/deposit", requireDepositAuth, async (c) => {
       c,
       400,
       "INVALID_BODY",
-      `Invalid deposit (amount ${MIN_HTG}–${MAX_HTG} HTG, method moncash)`,
+      "Invalid deposit (amount must be a positive integer HTG, method moncash)",
     );
   }
 
@@ -953,6 +952,31 @@ deposit.post("/wallet/deposit", requireDepositAuth, async (c) => {
 
   const amountHtg = parsed.data.amountHtg;
   const amountCents = amountHtg * 100;
+
+  const depositRail = await db
+    .select()
+    .from(paymentRailConfigs)
+    .where(
+      and(
+        eq(paymentRailConfigs.method, "moncash"),
+        eq(paymentRailConfigs.environment, environment),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (
+    depositRail &&
+    (amountCents < depositRail.depositMinAmountCents || amountCents > depositRail.depositMaxAmountCents)
+  ) {
+    return apiError(
+      c,
+      400,
+      "AMOUNT_OUT_OF_RANGE",
+      `Amount must be between ${depositRail.depositMinAmountCents / 100} and ${depositRail.depositMaxAmountCents / 100} HTG`,
+    );
+  }
+
   const referenceId = `dep_${user.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const apiPublic =
     process.env.API_URL ??
@@ -1055,7 +1079,7 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
       c,
       400,
       "INVALID_BODY",
-      `Invalid withdraw (amount ${MIN_HTG}–${MAX_HTG} HTG, method + account required)`,
+      "Invalid withdraw (amount must be a positive integer HTG, method + account required)",
     );
   }
 
@@ -1102,6 +1126,18 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
 
   const amountHtg = parsed.data.amountHtg;
   const amountCents = amountHtg * 100;
+
+  if (
+    amountCents < withdrawRail.withdrawalMinAmountCents ||
+    amountCents > withdrawRail.withdrawalMaxAmountCents
+  ) {
+    return apiError(
+      c,
+      400,
+      "AMOUNT_OUT_OF_RANGE",
+      `Amount must be between ${withdrawRail.withdrawalMinAmountCents / 100} and ${withdrawRail.withdrawalMaxAmountCents / 100} HTG`,
+    );
+  }
 
   const withdrawWalletBalance = await getBalanceCents(user.id, environment);
   const withdrawable = withdrawWalletBalance.balanceCents - withdrawWalletBalance.bonusCents;
@@ -1239,8 +1275,8 @@ withdraw.get("/wallet/payment-rails", requireDepositAuth, async (c) => {
         enabled: r.enabled,
         accountName: r.accountName,
         accountNumber: r.accountNumber,
-        minAmountCents: r.minAmountCents,
-        maxAmountCents: r.maxAmountCents,
+        minAmountCents: r.depositMinAmountCents,
+        maxAmountCents: r.depositMaxAmountCents,
         instructions: r.instructions,
       })),
   });
@@ -1287,12 +1323,12 @@ withdraw.post("/wallet/deposit-requests", requireDepositAuth, async (c) => {
   }
 
   const amountCents = parsed.data.amountHtg * 100;
-  if (amountCents < rail.minAmountCents || amountCents > rail.maxAmountCents) {
+  if (amountCents < rail.depositMinAmountCents || amountCents > rail.depositMaxAmountCents) {
     return apiError(
       c,
       400,
       "AMOUNT_OUT_OF_RANGE",
-      `Amount must be between ${rail.minAmountCents / 100} and ${rail.maxAmountCents / 100} HTG`,
+      `Amount must be between ${rail.depositMinAmountCents / 100} and ${rail.depositMaxAmountCents / 100} HTG`,
     );
   }
 

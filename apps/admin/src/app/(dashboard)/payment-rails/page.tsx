@@ -15,8 +15,10 @@ type Rail = {
   withdrawalEnabled: boolean;
   accountName: string;
   accountNumber: string;
-  minAmountCents: number;
-  maxAmountCents: number;
+  depositMinAmountCents: number;
+  depositMaxAmountCents: number;
+  withdrawalMinAmountCents: number;
+  withdrawalMaxAmountCents: number;
   instructions: string | null;
   environment: string;
 };
@@ -62,8 +64,10 @@ export default function PaymentRailsPage() {
           withdrawalEnabled: rail.withdrawalEnabled,
           accountName: rail.accountName,
           accountNumber: rail.accountNumber,
-          minAmountCents: rail.minAmountCents,
-          maxAmountCents: rail.maxAmountCents,
+          depositMinAmountCents: rail.depositMinAmountCents,
+          depositMaxAmountCents: rail.depositMaxAmountCents,
+          withdrawalMinAmountCents: rail.withdrawalMinAmountCents,
+          withdrawalMaxAmountCents: rail.withdrawalMaxAmountCents,
           instructions: rail.instructions,
         }),
       });
@@ -175,16 +179,21 @@ export default function PaymentRailsPage() {
                       }
                     />
                   </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Bornes depot</p>
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Min (HTG)</Label>
                     <Input
                       type="number"
-                      value={rail.minAmountCents / 100}
+                      value={rail.depositMinAmountCents / 100}
                       onChange={(e) =>
                         setRails((all) =>
                           all.map((r) =>
                             r.id === rail.id
-                              ? { ...r, minAmountCents: Math.round(Number(e.target.value) * 100) }
+                              ? { ...r, depositMinAmountCents: Math.round(Number(e.target.value) * 100) }
                               : r,
                           ),
                         )
@@ -195,12 +204,12 @@ export default function PaymentRailsPage() {
                     <Label>Max (HTG)</Label>
                     <Input
                       type="number"
-                      value={rail.maxAmountCents / 100}
+                      value={rail.depositMaxAmountCents / 100}
                       onChange={(e) =>
                         setRails((all) =>
                           all.map((r) =>
                             r.id === rail.id
-                              ? { ...r, maxAmountCents: Math.round(Number(e.target.value) * 100) }
+                              ? { ...r, depositMaxAmountCents: Math.round(Number(e.target.value) * 100) }
                               : r,
                           ),
                         )
@@ -208,7 +217,44 @@ export default function PaymentRailsPage() {
                     />
                   </div>
                 </div>
-              )}
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Bornes retrait</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Min (HTG)</Label>
+                    <Input
+                      type="number"
+                      value={rail.withdrawalMinAmountCents / 100}
+                      onChange={(e) =>
+                        setRails((all) =>
+                          all.map((r) =>
+                            r.id === rail.id
+                              ? { ...r, withdrawalMinAmountCents: Math.round(Number(e.target.value) * 100) }
+                              : r,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Max (HTG)</Label>
+                    <Input
+                      type="number"
+                      value={rail.withdrawalMaxAmountCents / 100}
+                      onChange={(e) =>
+                        setRails((all) =>
+                          all.map((r) =>
+                            r.id === rail.id
+                              ? { ...r, withdrawalMaxAmountCents: Math.round(Number(e.target.value) * 100) }
+                              : r,
+                          ),
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
               {rail.method === "natcash" && (
                 <div className="space-y-2">
                   <Label>Instructions</Label>

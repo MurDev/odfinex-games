@@ -126,7 +126,9 @@ export const WalletCreditUserRequestSchema = z.object({
 export type WalletCreditUserRequest = z.infer<typeof WalletCreditUserRequestSchema>;
 
 export const WalletDepositRequestSchema = z.object({
-  amountHtg: z.number().int().min(10).max(75_000),
+  // No fixed min/max here: the real bounds are configured per rail in
+  // payment_rail_config (Odfinex admin), not hardcoded in the schema.
+  amountHtg: z.number().int().positive(),
   method: z.enum(["moncash"]).optional().default("moncash"),
   successUrl: z.string().url().optional(),
   errorUrl: z.string().url().optional(),
@@ -156,7 +158,9 @@ export type WalletDepositCompleteResponse = z.infer<
 >;
 
 export const WalletWithdrawRequestSchema = z.object({
-  amountHtg: z.number().int().min(10).max(75_000),
+  // No fixed min/max here: the real bounds are configured per rail in
+  // payment_rail_config (Odfinex admin), not hardcoded in the schema.
+  amountHtg: z.number().int().positive(),
   method: z.enum(["moncash", "natcash"]).optional().default("moncash"),
   account: z.string().min(3).max(64).optional(),
   accountName: z.string().min(1).max(128).optional(),
@@ -184,7 +188,9 @@ export const WalletWithdrawResponseSchema = z.object({
 export type WalletWithdrawResponse = z.infer<typeof WalletWithdrawResponseSchema>;
 
 export const ManualDepositRequestCreateSchema = z.object({
-  amountHtg: z.number().int().min(10).max(75_000),
+  // No fixed min/max here: the real bounds are configured per rail in
+  // payment_rail_config (Odfinex admin), not hardcoded in the schema.
+  amountHtg: z.number().int().positive(),
   method: z.enum(["natcash"]).optional().default("natcash"),
   reference: z.string().min(3).max(128).optional(),
   paymentProofUrl: z.string().url().optional(),

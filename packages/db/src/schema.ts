@@ -224,8 +224,11 @@ export const paymentRailConfigs = pgTable(
     withdrawalEnabled: boolean("withdrawal_enabled").notNull().default(true),
     accountName: text("account_name").notNull().default(""),
     accountNumber: text("account_number").notNull().default(""),
-    minAmountCents: integer("min_amount_cents").notNull().default(1000),
-    maxAmountCents: integer("max_amount_cents").notNull().default(7_500_000),
+    depositMinAmountCents: integer("deposit_min_amount_cents").notNull().default(1000),
+    depositMaxAmountCents: integer("deposit_max_amount_cents").notNull().default(7_500_000),
+    /** Independent from deposit bounds: a rail can allow small deposits but only large withdrawals, or vice versa. */
+    withdrawalMinAmountCents: integer("withdrawal_min_amount_cents").notNull().default(1000),
+    withdrawalMaxAmountCents: integer("withdrawal_max_amount_cents").notNull().default(7_500_000),
     instructions: text("instructions"),
     environment: environmentEnum("environment").notNull().default("live"),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),

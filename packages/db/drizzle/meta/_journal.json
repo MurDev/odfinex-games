@@ -85,6 +85,13 @@
       "when": 1786690000000,
       "tag": "0011_opposite_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786780000000,
+      "tag": "0012_clammy_dragon_lord",
+      "breakpoints": true
     }
   ]
 }
