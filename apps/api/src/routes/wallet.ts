@@ -1139,6 +1139,22 @@ withdraw.post("/wallet/withdraw", requireDepositAuth, async (c) => {
     );
   }
 
+  const existingWithdrawal = await db
+    .select({ id: withdrawalRequests.id })
+    .from(withdrawalRequests)
+    .where(
+      and(
+        eq(withdrawalRequests.userId, user.id),
+        eq(withdrawalRequests.environment, environment),
+        inArray(withdrawalRequests.status, ["pending", "processing"]),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  if (existingWithdrawal) {
+    return apiError(c, 409, "WITHDRAWAL_ALREADY_PENDING", "A withdrawal request is already pending");
+  }
+
   const withdrawWalletBalance = await getBalanceCents(user.id, environment);
   const withdrawable = withdrawWalletBalance.balanceCents - withdrawWalletBalance.bonusCents;
   if (withdrawable < amountCents) {
@@ -1330,6 +1346,22 @@ withdraw.post("/wallet/deposit-requests", requireDepositAuth, async (c) => {
       "AMOUNT_OUT_OF_RANGE",
       `Amount must be between ${rail.depositMinAmountCents / 100} and ${rail.depositMaxAmountCents / 100} HTG`,
     );
+  }
+
+  const existingDepositRequest = await db
+    .select({ id: manualDepositRequests.id })
+    .from(manualDepositRequests)
+    .where(
+      and(
+        eq(manualDepositRequests.userId, user.id),
+        eq(manualDepositRequests.environment, environment),
+        eq(manualDepositRequests.status, "pending"),
+      ),
+    )
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  if (existingDepositRequest) {
+    return apiError(c, 409, "DEPOSIT_REQUEST_ALREADY_PENDING", "A deposit request is already pending");
   }
 
   const [inserted] = await db
