@@ -838,8 +838,10 @@ adminRoutes.get("/admin/payment-rails", requirePlatformSession, requireAdmin, as
       withdrawalEnabled: r.withdrawalEnabled,
       accountName: r.accountName,
       accountNumber: r.accountNumber,
-      minAmountCents: r.minAmountCents,
-      maxAmountCents: r.maxAmountCents,
+      depositMinAmountCents: r.depositMinAmountCents,
+      depositMaxAmountCents: r.depositMaxAmountCents,
+      withdrawalMinAmountCents: r.withdrawalMinAmountCents,
+      withdrawalMaxAmountCents: r.withdrawalMaxAmountCents,
       instructions: r.instructions,
       environment: r.environment,
       updatedAt: r.updatedAt.toISOString(),
@@ -868,18 +870,30 @@ adminRoutes.patch("/admin/payment-rails/:id", requirePlatformSession, requireAdm
     typeof body.accountNumber === "string"
       ? body.accountNumber.trim()
       : existing.accountNumber;
-  const minAmountCents =
-    typeof body.minAmountCents === "number"
-      ? body.minAmountCents
-      : typeof body.minAmountHtg === "number"
-        ? Math.round(body.minAmountHtg * 100)
-        : existing.minAmountCents;
-  const maxAmountCents =
-    typeof body.maxAmountCents === "number"
-      ? body.maxAmountCents
-      : typeof body.maxAmountHtg === "number"
-        ? Math.round(body.maxAmountHtg * 100)
-        : existing.maxAmountCents;
+  const depositMinAmountCents =
+    typeof body.depositMinAmountCents === "number"
+      ? body.depositMinAmountCents
+      : typeof body.depositMinAmountHtg === "number"
+        ? Math.round(body.depositMinAmountHtg * 100)
+        : existing.depositMinAmountCents;
+  const depositMaxAmountCents =
+    typeof body.depositMaxAmountCents === "number"
+      ? body.depositMaxAmountCents
+      : typeof body.depositMaxAmountHtg === "number"
+        ? Math.round(body.depositMaxAmountHtg * 100)
+        : existing.depositMaxAmountCents;
+  const withdrawalMinAmountCents =
+    typeof body.withdrawalMinAmountCents === "number"
+      ? body.withdrawalMinAmountCents
+      : typeof body.withdrawalMinAmountHtg === "number"
+        ? Math.round(body.withdrawalMinAmountHtg * 100)
+        : existing.withdrawalMinAmountCents;
+  const withdrawalMaxAmountCents =
+    typeof body.withdrawalMaxAmountCents === "number"
+      ? body.withdrawalMaxAmountCents
+      : typeof body.withdrawalMaxAmountHtg === "number"
+        ? Math.round(body.withdrawalMaxAmountHtg * 100)
+        : existing.withdrawalMaxAmountCents;
   const instructions =
     typeof body.instructions === "string" ? body.instructions : existing.instructions;
 
@@ -901,8 +915,10 @@ adminRoutes.patch("/admin/payment-rails/:id", requirePlatformSession, requireAdm
       withdrawalEnabled,
       accountName,
       accountNumber,
-      minAmountCents,
-      maxAmountCents,
+      depositMinAmountCents,
+      depositMaxAmountCents,
+      withdrawalMinAmountCents,
+      withdrawalMaxAmountCents,
       instructions,
       updatedAt: new Date(),
     })
