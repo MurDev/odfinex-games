@@ -107,7 +107,17 @@ export default function SandboxGamePage() {
   };
 
   return (
-    <main style={{ maxWidth: 560, margin: "0 auto", padding: "4rem 1.5rem" }}>
+    <main
+      style={{
+        maxWidth: 560,
+        margin: "0 auto",
+        padding: "4rem 1.5rem",
+        minHeight: "100vh",
+        background:
+          "radial-gradient(1000px 500px at 90% 10%, #2a1f12 0%, #0b1218 50%, #070b10 100%)",
+        color: "#e8eef3",
+      }}
+    >
       <p style={{ letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.6, fontSize: "0.8rem" }}>
         Sandbox game
       </p>

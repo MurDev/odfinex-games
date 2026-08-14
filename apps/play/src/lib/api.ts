@@ -1,6 +1,28 @@
-import { CreateLaunchResponseSchema } from "@odfinex/shared";
+import { CreateLaunchResponseSchema, GamesListResponseSchema, type GameClient } from "@odfinex/shared";
 
 const apiUrl = (process.env.API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+
+const FALLBACK_GAMES: GameClient[] = [
+  {
+    clientId: "duelpion.live",
+    name: "DUELPION",
+    launchUrl: "http://localhost:3002",
+    isActive: true,
+  },
+];
+
+export async function loadGames(): Promise<GameClient[]> {
+  try {
+    const res = await fetch(`${apiUrl}/v1/games`, {
+      next: { revalidate: 30 },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = GamesListResponseSchema.parse(await res.json());
+    return data.games.filter((g) => g.isActive);
+  } catch {
+    return FALLBACK_GAMES;
+  }
+}
 
 export async function createLaunch(clientId: string, sessionToken: string) {
   const res = await fetch(`${apiUrl}/v1/launch`, {
