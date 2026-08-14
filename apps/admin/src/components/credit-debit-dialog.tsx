@@ -36,9 +36,11 @@ export function CreditDebitDialog({
   const [error, setError] = useState("");
   const [amountHtg, setAmountHtg] = useState("");
   const [reason, setReason] = useState("");
+  const [referenceId, setReferenceId] = useState("");
   const [category, setCategory] = useState(
     direction === "credit" ? "admin_investment" : "admin_debit",
   );
+  const requiresReference = isCredit && category === "depot_manual";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,6 +54,12 @@ export function CreditDebitDialog({
       return;
     }
 
+    if (requiresReference && !referenceId.trim()) {
+      setError("Une reference unique est requise pour un depot manuel");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/proxy/admin/users/${userId}/${direction}`, {
         method: "POST",
@@ -60,6 +68,7 @@ export function CreditDebitDialog({
           amountCents,
           category,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
+          ...(referenceId.trim() ? { referenceId: referenceId.trim() } : {}),
         }),
       });
 
@@ -71,6 +80,7 @@ export function CreditDebitDialog({
       setOpen(false);
       setAmountHtg("");
       setReason("");
+      setReferenceId("");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Une erreur est survenue");
@@ -123,6 +133,8 @@ export function CreditDebitDialog({
                 {direction === "credit" ? (
                   <>
                     <option value="admin_investment">Approvisionnement</option>
+                    <option value="depot_manual">Depot manuel</option>
+                    <option value="weekly_reward">Recompense hebdomadaire (classement)</option>
                     <option value="bonus">Bonus</option>
                     <option value="refund">Remboursement</option>
                     <option value="grant">Grant test</option>
@@ -135,7 +147,31 @@ export function CreditDebitDialog({
                   </>
                 )}
               </select>
+              {category === "bonus" && (
+                <p className="text-xs text-muted-foreground">
+                  Non retirable : ajoute au solde mais reste bloque pour le retrait.
+                </p>
+              )}
+              {category === "weekly_reward" && (
+                <p className="text-xs text-muted-foreground">
+                  Retirable : ajoute au solde retirable normalement.
+                </p>
+              )}
             </div>
+            {requiresReference && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Reference (unique)</label>
+                <Input
+                  placeholder="ex. numero de transaction bancaire"
+                  value={referenceId}
+                  onChange={(e) => setReferenceId(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Empeche de crediter deux fois le meme depot.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Motif (optionnel)</label>
               <Input

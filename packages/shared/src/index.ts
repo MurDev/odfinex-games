@@ -79,6 +79,7 @@ export const LedgerCategorySchema = z.enum([
   "depot_manual",
   "bonus",
   "reward",
+  "weekly_reward",
   "grant",
   "refund",
   "withdrawal",

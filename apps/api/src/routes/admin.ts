@@ -679,10 +679,20 @@ adminRoutes.post("/admin/users/:id/credit", requirePlatformSession, requireAdmin
     return apiError(c, 400, "INVALID_BODY", "amountCents (positive int) is required");
   }
 
+  const category = parsed.data.category ?? "admin_investment";
+
+  if (category === "depot_manual" && !parsed.data.referenceId?.trim()) {
+    return apiError(
+      c,
+      400,
+      "REFERENCE_REQUIRED",
+      "A unique referenceId is required for a manual deposit (depot_manual)",
+    );
+  }
+
   const referenceId =
     parsed.data.referenceId ?? `admin_credit_${id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-  const category = parsed.data.category ?? "admin_investment";
   const result = await applyLedgerMutation({
     userId: id,
     clientId: "platform",

@@ -145,7 +145,7 @@ export const ledgerEntries = pgTable(
     type: text("type").notNull(), // debit | credit
     amountCents: integer("amount_cents").notNull(),
     balanceAfterCents: integer("balance_after_cents").notNull(),
-    /** Credit category: deposit, depot_manual, bonus, reward, grant, refund… Debits: withdrawal, game… */
+    /** Credit category: deposit, depot_manual, bonus, reward, weekly_reward, grant, refund… Debits: withdrawal, game… */
     category: text("category"),
     /** Bonus (non-withdrawable) share of this entry, in cents. Positive on bonus credits, negative when bonus is consumed by a debit. */
     bonusCents: integer("bonus_cents").notNull().default(0),
