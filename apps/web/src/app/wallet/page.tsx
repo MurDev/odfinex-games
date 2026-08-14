@@ -113,13 +113,14 @@ export default async function WalletPage({
               key={tx.id}
               style={{
                 display: "flex",
+                flexWrap: "wrap",
                 justifyContent: "space-between",
-                gap: "1rem",
+                gap: "0.35rem 1rem",
                 padding: "0.85rem 0",
                 borderBottom: "1px solid rgba(255,255,255,0.08)",
               }}
             >
-              <span>
+              <span style={{ minWidth: 0, overflowWrap: "break-word" }}>
                 <strong style={{ textTransform: "capitalize" }}>{tx.type}</strong>
                 <span style={{ opacity: 0.55, marginLeft: 8 }}>{tx.reason}</span>
                 <br />
@@ -130,6 +131,7 @@ export default async function WalletPage({
               <span
                 style={{
                   fontWeight: 600,
+                  whiteSpace: "nowrap",
                   color: tx.type === "credit" ? "#34d399" : "#f87171",
                 }}
               >

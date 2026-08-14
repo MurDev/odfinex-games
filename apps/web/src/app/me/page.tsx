@@ -45,7 +45,7 @@ export default async function MePage() {
             border: "1px solid rgba(255,255,255,0.2)",
             borderRadius: 8,
             color: "#e8eef3",
-            padding: "0.6rem 1.2rem",
+            padding: "0.75rem 1.2rem",
             cursor: "pointer",
             fontSize: "0.9rem",
           }}
