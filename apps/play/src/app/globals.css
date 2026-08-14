@@ -47,12 +47,18 @@ a {
 }
 
 .play-header {
+  background: var(--night-blue);
+  box-shadow: 0 12px 24px rgba(16, 32, 79, 0.18);
+}
+
+.play-header__inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  width: min(1180px, calc(100% - 32px));
   min-height: 68px;
-  margin-bottom: 24px;
+  margin: 0 auto;
 }
 
 .play-header__brand {
@@ -60,6 +66,7 @@ a {
   align-items: center;
   min-height: 40px;
   gap: 10px;
+  color: #fff;
   text-decoration: none;
   font-weight: 800;
 }

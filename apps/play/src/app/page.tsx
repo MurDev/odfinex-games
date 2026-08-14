@@ -43,22 +43,26 @@ export default async function HomePage() {
   const games = await loadGames();
 
   return (
-    <main className="play-page">
+    <>
       <header className="play-header">
-        <a className="play-header__brand" href={webUrl}>
-          <span className="play-header__mark">OG</span>
-          <span className="play-header__text">Odfinex Games</span>
-        </a>
+        <div className="play-header__inner">
+          <a className="play-header__brand" href={webUrl}>
+            <span className="play-header__mark">OG</span>
+            <span className="play-header__text">Odfinex Games</span>
+          </a>
+        </div>
       </header>
 
-      <section className="play-section" aria-labelledby="games-title">
-        <h2 id="games-title">Jeux</h2>
-        <div className="play-grid">
-          {games.map((game) => (
-            <GameTile key={game.clientId} game={game} />
-          ))}
-        </div>
-      </section>
-    </main>
+      <main className="play-page">
+        <section className="play-section" aria-labelledby="games-title">
+          <h2 id="games-title">Jeux</h2>
+          <div className="play-grid">
+            {games.map((game) => (
+              <GameTile key={game.clientId} game={game} />
+            ))}
+          </div>
+        </section>
+      </main>
+    </>
   );
 }
