@@ -28,7 +28,7 @@ function GameTile({ game }: { game: GameClient }) {
   return (
     <a
       className="play-tile"
-      href={`${webUrl}/launch/${encodeURIComponent(game.clientId)}`}
+      href={`${webUrl}/launch/${encodeURIComponent(game.clientId)}?src=play`}
       style={{ "--accent": accent, "--accent-2": accent2 } as React.CSSProperties}
     >
       <span className="play-tile__icon" aria-hidden="true">

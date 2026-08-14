@@ -5,27 +5,31 @@ import { createLaunch } from "@/lib/api";
 
 type PageProps = {
   params: Promise<{ clientId: string }>;
+  searchParams: Promise<{ src?: string }>;
 };
 
-function googleStartUrl(clientId: string) {
+function googleStartUrl(clientId: string, src?: string) {
   const url = new URL("/api/auth/google", process.env.AUTH_URL ?? "http://localhost:3000");
-  url.searchParams.set("returnTo", `/launch/${encodeURIComponent(clientId)}`);
+  const returnTo = new URL(`/launch/${encodeURIComponent(clientId)}`, url);
+  if (src) returnTo.searchParams.set("src", src);
+  url.searchParams.set("returnTo", returnTo.pathname + returnTo.search);
   return url.toString();
 }
 
-export default async function LaunchPage({ params }: PageProps) {
+export default async function LaunchPage({ params, searchParams }: PageProps) {
   const { clientId } = await params;
+  const { src } = await searchParams;
 
   const sessionToken = await getPlatformSessionToken();
   if (!sessionToken) {
-    redirect(googleStartUrl(clientId));
+    redirect(googleStartUrl(clientId, src));
   }
 
   const result = await createLaunch(clientId, sessionToken);
 
   if (!result.ok) {
     if (result.status === 401) {
-      redirect(googleStartUrl(clientId));
+      redirect(googleStartUrl(clientId, src));
     }
 
     return (
@@ -45,6 +49,12 @@ export default async function LaunchPage({ params }: PageProps) {
         </p>
       </main>
     );
+  }
+
+  if (src === "play") {
+    const launchUrl = new URL(result.data.launchUrl);
+    launchUrl.searchParams.set("from", "play");
+    redirect(launchUrl.toString());
   }
 
   redirect(result.data.launchUrl);
