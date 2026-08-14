@@ -41,8 +41,6 @@ function GameTile({ game }: { game: GameClient }) {
 
 export default async function HomePage() {
   const games = await loadGames();
-  const featured = games.slice(0, 3);
-  const showFeatured = games.length >= 2;
 
   return (
     <main className="play-page">
@@ -51,24 +49,10 @@ export default async function HomePage() {
           <span className="play-header__mark">OG</span>
           <span className="play-header__text">Odfinex Games</span>
         </a>
-        <a className="play-header__login" href={`${webUrl}/login`}>
-          Se connecter
-        </a>
       </header>
 
-      {showFeatured && (
-        <section className="play-section play-featured" aria-labelledby="featured-title">
-          <h2 id="featured-title">Jeux en vedette</h2>
-          <div className="play-featured__track">
-            {featured.map((game) => (
-              <GameTile key={game.clientId} game={game} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="play-section" aria-labelledby="all-games-title">
-        <h2 id="all-games-title">Tous les jeux</h2>
+      <section className="play-section" aria-labelledby="games-title">
+        <h2 id="games-title">Jeux</h2>
         <div className="play-grid">
           {games.map((game) => (
             <GameTile key={game.clientId} game={game} />
