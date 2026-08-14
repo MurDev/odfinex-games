@@ -41,7 +41,6 @@ function sortGames(games: GameClient[]): GameClient[] {
 
 export default async function HomePage() {
   const games = sortGames(await loadGames());
-  const activeCount = games.length;
 
   return (
     <main className="landing">
@@ -61,45 +60,10 @@ export default async function HomePage() {
               Wallet
             </Link>
           </div>
-
-          <div className="portal-status" aria-label="Informations plateforme">
-            <div>
-              <strong>{activeCount}</strong>
-              <span>jeu{activeCount > 1 ? "x" : ""} live</span>
-            </div>
-            <div>
-              <strong>1</strong>
-              <span>compte</span>
-            </div>
-            <div>
-              <strong>HTG</strong>
-              <span>wallet</span>
-            </div>
-          </div>
         </div>
 
         <div className="hero-slider-wrap" aria-label="Hub de jeux">
           <HeroSlider games={games.map((game) => ({ game, copy: getGameCopy(game.clientId) }))} />
-        </div>
-      </section>
-
-      <section className="portal-modules-row" aria-label="Acces rapides">
-        <Link className="portal-module portal-module--wallet" href="/wallet">
-          <span className="portal-module__icon">HTG</span>
-          <strong>Wallet</strong>
-          <span>Solde, depots et retraits</span>
-        </Link>
-
-        <Link className="portal-module portal-module--account" href="/me">
-          <span className="portal-module__icon">ID</span>
-          <strong>Compte joueur</strong>
-          <span>Profil unique pour tous les jeux</span>
-        </Link>
-
-        <div className="portal-module portal-module--soon">
-          <span className="portal-module__icon">+</span>
-          <strong>Next game</strong>
-          <span>Nouvelles tuiles a venir</span>
         </div>
       </section>
 
@@ -109,10 +73,6 @@ export default async function HomePage() {
             <p className="eyebrow">Catalogue</p>
             <h2 id="catalogue-title">Jeux disponibles</h2>
           </div>
-          <p>
-            Chaque card presente le style de jeu, le rythme et le statut, pour
-            permettre au joueur de choisir rapidement ou reprendre son parcours.
-          </p>
         </div>
 
         <div className="games-grid">
@@ -150,21 +110,6 @@ export default async function HomePage() {
             </a>
           );
         })}
-        </div>
-      </section>
-
-      <section className="platform-band" aria-label="Fonctionnalites plateforme">
-        <div className="platform-feature">
-          <strong>Compte unique</strong>
-          <p>Connexion Google et retour automatique vers le jeu selectionne.</p>
-        </div>
-        <div className="platform-feature">
-          <strong>Wallet integre</strong>
-          <p>Solde visible dans l&apos;en-tete et acces direct aux operations.</p>
-        </div>
-        <div className="platform-feature">
-          <strong>Catalogue evolutif</strong>
-          <p>Les jeux actifs remontent depuis l&apos;API avec un fallback local.</p>
         </div>
       </section>
     </main>

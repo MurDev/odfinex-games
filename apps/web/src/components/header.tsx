@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import Link from "next/link";
+import { ScrollHeader } from "@/components/scroll-header";
 
 const apiUrl = (
   process.env.API_URL ??
@@ -34,7 +35,7 @@ export default async function Header() {
   }
 
   return (
-    <header className="site-header">
+    <ScrollHeader>
       <div className="site-header__inner">
         <Link href="/" className="brand-link">
           <span className="brand-link__mark">OG</span>
@@ -68,6 +69,6 @@ export default async function Header() {
           )}
         </nav>
       </div>
-    </header>
+    </ScrollHeader>
   );
 }
