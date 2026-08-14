@@ -1,33 +1,12 @@
 import Link from "next/link";
 import { GamesListResponseSchema, type GameClient } from "@odfinex/shared";
+import { HeroSlider } from "@/components/hero-slider";
+import { getGameCopy } from "@/lib/game-copy";
 
 const apiUrl = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(
   /\/$/,
   "",
 );
-
-const GAME_COPY: Record<
-  string,
-  {
-    blurb: string;
-    accent: string;
-    glow: string;
-    category: string;
-    players: string;
-    pace: string;
-    badge: string;
-  }
-> = {
-  "duelpion.live": {
-    blurb: "Duels de pions rapides avec une lecture tactique claire, entre Morpion et Gomoku.",
-    accent: "#16d7ff",
-    glow: "#1746ff",
-    category: "Stratégie",
-    players: "1v1",
-    pace: "Rapide",
-    badge: "Hot pick",
-  },
-};
 
 const FALLBACK_GAMES: GameClient[] = [
   {
@@ -99,63 +78,28 @@ export default async function HomePage() {
           </div>
         </div>
 
-        <div className="portal-stage" aria-label="Hub de jeux">
-          <div className="portal-stage__halo" aria-hidden="true" />
-          <div className="portal-stage__rail" aria-hidden="true" />
+        <div className="hero-slider-wrap" aria-label="Hub de jeux">
+          <HeroSlider games={games.map((game) => ({ game, copy: getGameCopy(game.clientId) }))} />
+        </div>
+      </section>
 
-          {games.map((game) => {
-            const copy = GAME_COPY[game.clientId] ?? {
-              blurb: "Jeu connecte a Odfinex Games avec authentification et wallet unifies.",
-              accent: "#ffd43b",
-              glow: "#7c5cff",
-              category: "Arcade",
-              players: "Multi",
-              pace: "Standard",
-              badge: "Nouveau",
-            };
-            return (
-              <a
-                key={game.clientId}
-                href={`/launch/${encodeURIComponent(game.clientId)}`}
-                className="portal-game portal-game--primary"
-                style={{ "--accent": copy.accent, "--glow": copy.glow } as React.CSSProperties}
-              >
-                <span className="portal-game__top">
-                  <span className="pill pill--live">Disponible</span>
-                  <span>{copy.badge}</span>
-                </span>
-                <span className="portal-game__arena" aria-hidden="true">
-                  <span className="portal-game__grid" />
-                  <span className="portal-game__token portal-game__token--a">X</span>
-                  <span className="portal-game__token portal-game__token--b">O</span>
-                  <span className="portal-game__token portal-game__token--c" />
-                </span>
-                <span>
-                  <strong>{game.name}</strong>
-                  <small>{copy.category} · {copy.players} · {copy.pace}</small>
-                  <span>{copy.blurb}</span>
-                </span>
-              </a>
-            );
-          })}
+      <section className="portal-modules-row" aria-label="Acces rapides">
+        <Link className="portal-module portal-module--wallet" href="/wallet">
+          <span className="portal-module__icon">HTG</span>
+          <strong>Wallet</strong>
+          <span>Solde, depots et retraits</span>
+        </Link>
 
-          <Link className="portal-module portal-module--wallet" href="/wallet">
-            <span className="portal-module__icon">HTG</span>
-            <strong>Wallet</strong>
-            <span>Solde, depots et retraits</span>
-          </Link>
+        <Link className="portal-module portal-module--account" href="/me">
+          <span className="portal-module__icon">ID</span>
+          <strong>Compte joueur</strong>
+          <span>Profil unique pour tous les jeux</span>
+        </Link>
 
-          <Link className="portal-module portal-module--account" href="/me">
-            <span className="portal-module__icon">ID</span>
-            <strong>Compte joueur</strong>
-            <span>Profil unique pour tous les jeux</span>
-          </Link>
-
-          <div className="portal-module portal-module--soon">
-            <span className="portal-module__icon">+</span>
-            <strong>Next game</strong>
-            <span>Nouvelles tuiles a venir</span>
-          </div>
+        <div className="portal-module portal-module--soon">
+          <span className="portal-module__icon">+</span>
+          <strong>Next game</strong>
+          <span>Nouvelles tuiles a venir</span>
         </div>
       </section>
 
@@ -173,15 +117,7 @@ export default async function HomePage() {
 
         <div className="games-grid">
         {games.map((game) => {
-          const copy = GAME_COPY[game.clientId] ?? {
-            blurb: "Jeu connecte a Odfinex Games avec authentification et wallet unifies.",
-            accent: "#ffd43b",
-            glow: "#7c5cff",
-            category: "Arcade",
-            players: "Multi",
-            pace: "Standard",
-            badge: "Nouveau",
-          };
+          const copy = getGameCopy(game.clientId);
           return (
             <a
               key={game.clientId}
