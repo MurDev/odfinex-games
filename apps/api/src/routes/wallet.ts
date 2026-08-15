@@ -1295,6 +1295,8 @@ withdraw.get("/wallet/payment-rails", requireDepositAuth, async (c) => {
         accountNumber: r.accountNumber,
         minAmountCents: r.depositMinAmountCents,
         maxAmountCents: r.depositMaxAmountCents,
+        withdrawalMinAmountCents: r.withdrawalMinAmountCents,
+        withdrawalMaxAmountCents: r.withdrawalMaxAmountCents,
         instructions: r.instructions,
       })),
   });
