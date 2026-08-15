@@ -154,6 +154,9 @@ importers:
       '@odfinex/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      motion:
+        specifier: ^12.4.7
+        version: 12.43.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       next:
         specifier: ^15.3.4
         version: 15.5.22(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
