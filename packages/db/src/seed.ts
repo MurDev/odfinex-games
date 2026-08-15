@@ -15,6 +15,8 @@ type SeedGame = {
   name: string;
   hidden: boolean;
   launchUrl: string;
+  /** Overrides `launchUrl` for the `live` environment only; falls back to `launchUrl` if unset. */
+  liveLaunchUrl?: string;
   redirectUrls: string[];
   walletEnabled: boolean;
   notifyUrl?: string;
@@ -41,6 +43,7 @@ const duelpionGame: SeedGame = {
   name: "DUELPION",
   hidden: false,
   launchUrl: "http://localhost:3005",
+  liveLaunchUrl: "https://duelpion-web.vercel.app",
   redirectUrls: [
     "http://localhost:3005",
     "http://localhost:3005/",
@@ -52,6 +55,7 @@ const duelpionGame: SeedGame = {
     "https://duelpion-web.vercel.app/",
   ],
   walletEnabled: true,
+  notifyUrl: "https://duelpion-production.up.railway.app/webhooks/odfinex/wallet-events",
 };
 
 const dominotacticsGame: SeedGame = {
@@ -80,6 +84,10 @@ for (const game of [sandboxGame, duelpionGame, dominotacticsGame]) {
     const clientId = `${game.slug}.${environment}`;
     const clientSecretHash =
       environment === "sandbox" ? hash(SANDBOX_SECRET) : undefined;
+    const launchUrl =
+      environment === "live" && game.liveLaunchUrl
+        ? game.liveLaunchUrl
+        : game.launchUrl;
 
     await db
       .insert(gameClients)
@@ -88,7 +96,7 @@ for (const game of [sandboxGame, duelpionGame, dominotacticsGame]) {
         name: game.name,
         environment,
         hidden: game.hidden,
-        launchUrl: game.launchUrl,
+        launchUrl,
         redirectUrls: game.redirectUrls,
         walletEnabled: game.walletEnabled,
         clientSecretHash,
@@ -100,7 +108,7 @@ for (const game of [sandboxGame, duelpionGame, dominotacticsGame]) {
           name: game.name,
           environment,
           hidden: game.hidden,
-          launchUrl: game.launchUrl,
+          launchUrl,
           redirectUrls: game.redirectUrls,
           isActive: true,
           walletEnabled: game.walletEnabled,
@@ -110,7 +118,7 @@ for (const game of [sandboxGame, duelpionGame, dominotacticsGame]) {
 
     console.log(
       `[db] seeded game_client: ${clientId} →`,
-      game.launchUrl,
+      launchUrl,
       `(wallet=${game.walletEnabled}, env=${environment})`,
     );
   }
