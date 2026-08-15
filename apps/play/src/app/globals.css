@@ -138,6 +138,16 @@ a {
   transition: transform 420ms ease;
 }
 
+.game-card__art-image {
+  object-fit: cover;
+  transition: transform 420ms ease;
+}
+
+.game-card:hover .game-card__art-image,
+.game-card:focus-visible .game-card__art-image {
+  transform: scale(1.06);
+}
+
 .game-card__art--v0 .game-card__art-pattern {
   background-image:
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.55) 0 1px, transparent 1px 26px),

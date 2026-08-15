@@ -4,6 +4,8 @@ export interface GameVisual {
   category: string;
   players: string;
   badge: string;
+  /** Artwork reel (public/games/*) ; a defaut, la card utilise un motif genere. */
+  image?: string;
 }
 
 /** Meme categories/couleurs que apps/web (src/lib/game-copy.ts) pour une identite coherente entre les deux apps. */
@@ -21,6 +23,7 @@ export const GAME_VISUALS: Record<string, GameVisual> = {
     category: "Plateau",
     players: "2-4",
     badge: "Gains reels",
+    image: "/games/ludolakay.png",
   },
 };
 

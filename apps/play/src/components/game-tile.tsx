@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Image from "next/image";
 import { motion, useReducedMotion } from "motion/react";
 import type { GameClient } from "@odfinex/shared";
 import { getGameVisual } from "@/lib/game-visuals";
@@ -65,11 +66,24 @@ function GameTile({ game, webUrl, index }: { game: GameClient; webUrl: string; i
       whileTap={reduceMotion ? undefined : { scale: 0.98 }}
     >
       <span className={`game-card__art game-card__art--v${variant}`} aria-hidden="true">
-        <span className="game-card__art-pattern" />
+        {visual.image ? (
+          <Image
+            src={visual.image}
+            alt=""
+            fill
+            sizes="(max-width: 520px) 50vw, (max-width: 820px) 33vw, 260px"
+            className="game-card__art-image"
+            priority={index < 3}
+          />
+        ) : (
+          <>
+            <span className="game-card__art-pattern" />
+            <span className="game-card__art-emblem" style={{ "--rotate": `${rotate}deg` } as CSSProperties}>
+              {initialsFor(game.name)}
+            </span>
+          </>
+        )}
         <span className="game-card__art-shine" />
-        <span className="game-card__art-emblem" style={{ "--rotate": `${rotate}deg` } as CSSProperties}>
-          {initialsFor(game.name)}
-        </span>
       </span>
 
       <span className="game-card__badge">{visual.badge}</span>
