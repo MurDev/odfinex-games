@@ -776,6 +776,65 @@ s2s.get("/client/withdrawal-requests", requireS2SClientAuth, async (c) => {
   });
 });
 
+/**
+ * S2S: let a game client cancel one of ITS OWN still-pending withdrawal requests (e.g. a
+ * "cancel" button in that game's admin dashboard). Mirrors the player-facing cancel route
+ * exactly (see cancelWithdrawalRequestRow) — same pending-only guard, same refund — the game
+ * client just authenticates as itself instead of as the player.
+ */
+s2s.post("/client/withdrawal-requests/:id/cancel", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const id = c.req.param("id");
+  if (!id) {
+    return apiError(c, 400, "INVALID_REQUEST", "Missing id");
+  }
+
+  const row = await db
+    .select()
+    .from(withdrawalRequests)
+    .where(eq(withdrawalRequests.id, id))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!row || row.clientId !== clientId) {
+    return apiError(c, 404, "NOT_FOUND", "Withdrawal request not found");
+  }
+  if (row.status !== "pending") {
+    return apiError(c, 409, "NOT_PENDING", "Only pending withdrawals can be cancelled");
+  }
+
+  await cancelWithdrawalRequestRow(row, "client");
+
+  return c.json({ id, status: "cancelled" });
+});
+
+/** S2S: let a game client cancel one of ITS OWN still-pending manual deposit requests. */
+s2s.post("/client/deposit-requests/:id/cancel", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const id = c.req.param("id");
+  if (!id) {
+    return apiError(c, 400, "INVALID_REQUEST", "Missing id");
+  }
+
+  const row = await db
+    .select()
+    .from(manualDepositRequests)
+    .where(eq(manualDepositRequests.id, id))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+
+  if (!row || row.clientId !== clientId) {
+    return apiError(c, 404, "NOT_FOUND", "Deposit request not found");
+  }
+  if (row.status !== "pending") {
+    return apiError(c, 409, "NOT_PENDING", "Only pending requests can be cancelled");
+  }
+
+  await cancelDepositRequestRow(row);
+
+  return c.json({ id, status: "cancelled" });
+});
+
 /** S2S read-only: full rail catalog for this game's environment, including disabled rails. */
 s2s.get("/client/payment-rails", requireS2SClientAuth, async (c) => {
   const environment = c.get("environment");
@@ -1222,6 +1281,31 @@ withdraw.get("/wallet/withdraw-requests", requireDepositAuth, async (c) => {
   });
 });
 
+/**
+ * Shared by the player-facing cancel route and the S2S client cancel route so both
+ * "cancelled by the player" and "cancelled by the game client" behave identically: same
+ * pending-only guard, same refund of the hold placed at request creation.
+ */
+async function cancelWithdrawalRequestRow(
+  row: typeof withdrawalRequests.$inferSelect,
+  cancelledBy: "player" | "client",
+) {
+  await applyLedgerMutation({
+    userId: row.userId,
+    clientId: "platform",
+    environment: row.environment as WalletEnvironment,
+    type: "credit",
+    amountCents: row.amountCents,
+    reason: `${row.method}_withdraw_cancel_refund${cancelledBy === "client" ? "_client" : ""}`,
+    referenceId: `cancel_${row.referenceId}`,
+  });
+
+  await db
+    .update(withdrawalRequests)
+    .set({ status: "cancelled", completedAt: new Date() })
+    .where(eq(withdrawalRequests.id, row.id));
+}
+
 withdraw.post("/wallet/withdraw-requests/:id/cancel", requireDepositAuth, async (c) => {
   const user = c.get("user");
   const environment = c.get("environment");
@@ -1241,20 +1325,7 @@ withdraw.post("/wallet/withdraw-requests/:id/cancel", requireDepositAuth, async 
     return apiError(c, 409, "NOT_PENDING", "Only pending withdrawals can be cancelled");
   }
 
-  await applyLedgerMutation({
-    userId: user.id,
-    clientId: "platform",
-    environment,
-    type: "credit",
-    amountCents: row.amountCents,
-    reason: `${row.method}_withdraw_cancel_refund`,
-    referenceId: `cancel_${row.referenceId}`,
-  });
-
-  await db
-    .update(withdrawalRequests)
-    .set({ status: "cancelled", completedAt: new Date() })
-    .where(eq(withdrawalRequests.id, id));
+  await cancelWithdrawalRequestRow(row, "player");
 
   const { balanceCents, bonusCents } = await getBalanceCents(user.id, environment);
   return c.json({ id, status: "cancelled", balanceCents, bonusCents });
@@ -1405,6 +1476,14 @@ withdraw.get("/wallet/deposit-requests", requireDepositAuth, async (c) => {
   });
 });
 
+/** No balance movement: a manual deposit only credits the wallet once Odfinex approves it. */
+async function cancelDepositRequestRow(row: typeof manualDepositRequests.$inferSelect) {
+  await db
+    .update(manualDepositRequests)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(manualDepositRequests.id, row.id));
+}
+
 withdraw.post("/wallet/deposit-requests/:id/cancel", requireDepositAuth, async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
@@ -1423,10 +1502,7 @@ withdraw.post("/wallet/deposit-requests/:id/cancel", requireDepositAuth, async (
     return apiError(c, 409, "NOT_PENDING", "Only pending requests can be cancelled");
   }
 
-  await db
-    .update(manualDepositRequests)
-    .set({ status: "cancelled", updatedAt: new Date() })
-    .where(eq(manualDepositRequests.id, id));
+  await cancelDepositRequestRow(row);
 
   return c.json({ id, status: "cancelled" });
 });
