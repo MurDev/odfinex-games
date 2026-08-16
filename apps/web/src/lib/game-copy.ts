@@ -16,6 +16,8 @@ export interface GameCopy {
   players: string;
   pace: string;
   badge: string;
+  /** Card artwork. Falls back to the generated CSS pattern when absent. */
+  image?: string;
   /** gallery[0] is the featured image; the rest populate the thumbnail strip. */
   gallery: GameShot[];
   links?: { telegram?: string; website?: string };
@@ -32,11 +34,64 @@ export const GAME_COPY: Record<string, GameCopy> = {
     players: "1v1",
     pace: "Rapide",
     badge: "Hot pick",
+    image: "/games/duelpion.png",
     gallery: [
       { id: "duelpion-board", alt: "Plateau de jeu DUELPION" },
       { id: "duelpion-victory", alt: "Ecran de victoire" },
       { id: "duelpion-leaderboard", alt: "Classement des joueurs" },
       { id: "duelpion-training", alt: "Mode entrainement" },
+    ],
+  },
+  "duelpion.sandbox": {
+    blurb: "Duels de pions rapides avec une lecture tactique claire, entre Morpion et Gomoku.",
+    description:
+      "DUELPION oppose deux joueurs sur une grille tactique : chaque coup compte, chaque ligne peut basculer la partie. Un format 1v1 rapide, pense pour enchainer les manches et grimper au classement.",
+    accent: "#16d7ff",
+    glow: "#1746ff",
+    category: "Stratégie",
+    players: "1v1",
+    pace: "Rapide",
+    badge: "Hot pick",
+    image: "/games/duelpion.png",
+    gallery: [
+      { id: "duelpion-board", alt: "Plateau de jeu DUELPION" },
+      { id: "duelpion-victory", alt: "Ecran de victoire" },
+      { id: "duelpion-leaderboard", alt: "Classement des joueurs" },
+      { id: "duelpion-training", alt: "Mode entrainement" },
+    ],
+  },
+  "dominotactics.live": {
+    blurb: "Domino americain All Fives avec mises en HTG, spinner et course a 100 points.",
+    description:
+      "DOMINO TACTICS reprend les regles classiques du All Fives avec spinner : place tes bones, marque sur les multiples de 5 et mise en HTG pour grimper au classement. Parties 1v1 rapides, contre un adversaire reel ou contre l'IA.",
+    accent: "#8b6cff",
+    glow: "#e8c468",
+    category: "Domino",
+    players: "1v1",
+    pace: "Standard",
+    badge: "Gains reels",
+    image: "/games/dominotactics.png",
+    gallery: [
+      { id: "dominotactics-board", alt: "Table de jeu DOMINO TACTICS" },
+      { id: "dominotactics-victory", alt: "Ecran de victoire" },
+      { id: "dominotactics-leaderboard", alt: "Classement des joueurs" },
+    ],
+  },
+  "dominotactics.sandbox": {
+    blurb: "Domino americain All Fives avec mises en HTG, spinner et course a 100 points.",
+    description:
+      "DOMINO TACTICS reprend les regles classiques du All Fives avec spinner : place tes bones, marque sur les multiples de 5 et mise en HTG pour grimper au classement. Parties 1v1 rapides, contre un adversaire reel ou contre l'IA.",
+    accent: "#8b6cff",
+    glow: "#e8c468",
+    category: "Domino",
+    players: "1v1",
+    pace: "Standard",
+    badge: "Gains reels",
+    image: "/games/dominotactics.png",
+    gallery: [
+      { id: "dominotactics-board", alt: "Table de jeu DOMINO TACTICS" },
+      { id: "dominotactics-victory", alt: "Ecran de victoire" },
+      { id: "dominotactics-leaderboard", alt: "Classement des joueurs" },
     ],
   },
   "ludolakay.live": {

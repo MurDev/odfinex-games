@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { GamesListResponseSchema, type GameClient } from "@odfinex/shared";
 import { HeroSlider } from "@/components/hero-slider";
@@ -87,10 +88,22 @@ export default async function HomePage() {
             >
               <span className="game-card__art">
                 <span className="game-card__badge">{copy.badge}</span>
-                <span className="game-card__board" />
-                <span className="game-card__chip" />
-                <span className="game-card__chip" />
-                <span className="game-card__spark" />
+                {copy.image ? (
+                  <Image
+                    src={copy.image}
+                    alt=""
+                    fill
+                    sizes="(max-width: 640px) 100vw, 360px"
+                    className="game-card__art-image"
+                  />
+                ) : (
+                  <>
+                    <span className="game-card__board" />
+                    <span className="game-card__chip" />
+                    <span className="game-card__chip" />
+                    <span className="game-card__spark" />
+                  </>
+                )}
               </span>
               <span className="game-card__body">
                 <span className="game-card__meta">

@@ -684,6 +684,15 @@ input {
     color-mix(in srgb, var(--accent) 12%, #fff);
 }
 
+.game-card__art-image {
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.game-card:hover .game-card__art-image {
+  transform: scale(1.035);
+}
+
 .game-card__board {
   position: absolute;
   inset: 30px 36px 18px;
