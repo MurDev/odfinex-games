@@ -16,6 +16,7 @@ export const GAME_VISUALS: Record<string, GameVisual> = {
     category: "Stratégie",
     players: "1v1",
     badge: "Hot pick",
+    image: "/games/duelpion.png",
   },
   "ludolakay.live": {
     accent: "#ffd43b",
