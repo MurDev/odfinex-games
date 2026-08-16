@@ -26,6 +26,14 @@ export const GAME_VISUALS: Record<string, GameVisual> = {
     badge: "Gains reels",
     image: "/games/ludolakay.png",
   },
+  "dominotactics.live": {
+    accent: "#8b6cff",
+    glow: "#e8c468",
+    category: "Domino",
+    players: "1v1",
+    badge: "Gains reels",
+    image: "/games/dominotactics.png",
+  },
 };
 
 export const FALLBACK_VISUAL: GameVisual = {
