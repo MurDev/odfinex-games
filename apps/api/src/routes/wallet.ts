@@ -651,20 +651,12 @@ s2s.get("/client/deposit-requests", requireS2SClientAuth, async (c) => {
   const offset = Number(c.req.query("offset") ?? 0) || 0;
   const status = c.req.query("status");
 
-  let whereClause = and(
-    sql`(
-      ${manualDepositRequests.clientId} = ${clientId}
-      OR ${manualDepositRequests.userId} IN (
-        SELECT user_id FROM ledger_entry WHERE client_id = ${clientId}
-        UNION
-        SELECT user_id FROM launch_token WHERE client_id = ${clientId}
-        UNION
-        SELECT user_id FROM manual_deposit_request WHERE client_id = ${clientId}
-      )
-    )`,
-  );
+  // Strictly scoped to this client's own deposit requests. Do not widen this with an
+  // OR-by-userId clause: that previously leaked a shared player's deposit requests made
+  // through *other* games (e.g. Duelpion's admin could see LudoLakay's NatCash deposits).
+  let whereClause = eq(manualDepositRequests.clientId, clientId);
   if (status) {
-    whereClause = and(whereClause, eq(manualDepositRequests.status, status));
+    whereClause = and(whereClause, eq(manualDepositRequests.status, status))!;
   }
 
   const [totalRow] = await db
@@ -724,20 +716,11 @@ s2s.get("/client/withdrawal-requests", requireS2SClientAuth, async (c) => {
   const offset = Number(c.req.query("offset") ?? 0) || 0;
   const status = c.req.query("status");
 
-  let whereClause = and(
-    sql`(
-      ${withdrawalRequests.clientId} = ${clientId}
-      OR ${withdrawalRequests.userId} IN (
-        SELECT user_id FROM ledger_entry WHERE client_id = ${clientId}
-        UNION
-        SELECT user_id FROM launch_token WHERE client_id = ${clientId}
-        UNION
-        SELECT user_id FROM withdrawal_request WHERE client_id = ${clientId}
-      )
-    )`,
-  );
+  // Strictly scoped to this client's own withdrawal requests — see the same note on
+  // /client/deposit-requests above for why the previous OR-by-userId clause was removed.
+  let whereClause = eq(withdrawalRequests.clientId, clientId);
   if (status) {
-    whereClause = and(whereClause, eq(withdrawalRequests.status, status));
+    whereClause = and(whereClause, eq(withdrawalRequests.status, status))!;
   }
 
   const [totalRow] = await db
