@@ -211,8 +211,8 @@ Chaque jeu expose **2 paires `clientId`/`client_secret`** : `{slug}.sandbox` et 
   (`NEXT_PUBLIC_APP_URL`, `APP_URL`, `CORS_ORIGINS`) et `game_client.{duelpion,dominotactics}.live`
   (`launchUrl`/`redirectUrls`) mis à jour, anciennes URLs `*.vercel.app` conservées en fallback dans
   `redirectUrls`/`CORS_ORIGINS`. Nameservers Hostinger des deux domaines pointés vers
-  `ns1.vercel-dns.com`/`ns2.vercel-dns.com` ; propagation DNS + émission SSL Vercel à reconfirmer
-  (`vercel domains inspect <domaine>`). Détail par jeu : Duelpion
+  `ns1.vercel-dns.com`/`ns2.vercel-dns.com` ; DNS propagé et SSL Vercel actif, confirmé (les deux
+  domaines répondent en 200, 16 août 2026). Détail par jeu : Duelpion
   [`DEPLOY.md`](../../DUELPION/DEPLOY.md), Domino Tactics [`DEPLOY.md`](../../DOMINO_TACTICS/DEPLOY.md).
 - **Cache turbo** : `turbo.json` → `remoteCache.enabled` + secrets GitHub `TURBO_TOKEN`/`TURBO_TEAM`.
 - Redéploiement Vercel sans commit : bouton *Redeploy* du dashboard, ou CLI depuis le dossier de l'app
