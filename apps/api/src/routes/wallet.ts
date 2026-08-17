@@ -601,6 +601,19 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
     .from(ledgerEntries)
     .where(whereClause);
 
+  // Linked withdrawal request status for ledger entries that are part of a
+  // withdrawal lifecycle (hold debit, refund/reject/cancel credit). Matches by
+  // referenceId, tolerating the refund_/reject_/cancel_ referenceId prefixes.
+  const withdrawalStatusSub = sql<string | null>`
+    (
+      select wr.status
+      from withdrawal_request wr
+      where wr.reference_id = ${ledgerEntries.referenceId}
+         or wr.reference_id = regexp_replace(${ledgerEntries.referenceId}, '^(refund_|reject_|cancel_)', '')
+      limit 1
+    )
+  `;
+
   const items = await db
     .select({
       id: ledgerEntries.id,
@@ -608,6 +621,8 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
       type: ledgerEntries.type,
       amountCents: ledgerEntries.amountCents,
       balanceAfterCents: ledgerEntries.balanceAfterCents,
+      bonusCents: ledgerEntries.bonusCents,
+      category: ledgerEntries.category,
       reason: ledgerEntries.reason,
       clientId: ledgerEntries.clientId,
       environment: ledgerEntries.environment,
@@ -615,6 +630,7 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
       createdAt: ledgerEntries.createdAt,
       displayName: users.name,
       email: users.email,
+      withdrawalStatus: withdrawalStatusSub,
     })
     .from(ledgerEntries)
     .leftJoin(users, eq(ledgerEntries.userId, users.id))
@@ -632,11 +648,14 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
       type: tx.type as "debit" | "credit",
       amountCents: tx.amountCents,
       balanceAfterCents: tx.balanceAfterCents,
+      bonusCents: tx.bonusCents,
+      category: tx.category,
       reason: tx.reason,
       clientId: tx.clientId,
       environment: tx.environment as WalletEnvironment,
       referenceId: tx.referenceId,
       createdAt: tx.createdAt.toISOString(),
+      withdrawalStatus: tx.withdrawalStatus ?? null,
     })),
     total: totalRow?.count ?? 0,
     limit,
