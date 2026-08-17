@@ -40,7 +40,7 @@ DUELPION (web app)
 | `odfinex-play` | Vercel | Surface sandbox SDK (lit `?token=` depuis l'URL) | https://odfinex-play.vercel.app |
 | `odfinex-api` | Railway | Hono API (identity, launch, wallet) | https://odfinex-api-production.up.railway.app |
 | Postgres | Railway | Base de données | interne, service `Postgres` |
-| `duelpion-web` | Vercel | Front DUELPION (Next.js + Phaser) | https://duelpion-web.vercel.app |
+| `duelpion-web` | Vercel | Front DUELPION (Next.js + Phaser) | https://duelpion.com (fallback https://duelpion-web.vercel.app) |
 | `duelpion` | Railway | Serveur DUELPION (Hono + SQLite persisté) | https://duelpion-production.up.railway.app |
 
 ### Identifiants utiles
@@ -164,7 +164,7 @@ main          →  production (CI + deploys Vercel)
 | `NEXT_PUBLIC_WEB_URL` | `https://odfinex-web.vercel.app` |
 | `NEXT_PUBLIC_PLAY_URL` | `https://odfinex-play.vercel.app` |
 | `NEXT_PUBLIC_ODFINEX_CLIENT_ID` | `duelpion.live` |
-| `NEXT_PUBLIC_APP_URL` | `https://duelpion-web.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | `https://duelpion.com` (fallback `https://duelpion-web.vercel.app`) |
 | `NEXT_PUBLIC_DUELPION_API_URL` | `https://duelpion-production.up.railway.app` |
 
 ## Modèle 2 environnements par jeu
@@ -206,6 +206,14 @@ Chaque jeu expose **2 paires `clientId`/`client_secret`** : `{slug}.sandbox` et 
   via l'URL **publique** du Postgres. Cette URL dépend du **TCP proxy du service Postgres** (`RAILWAY_TCP_PROXY_DOMAIN/PORT`).
   → **Ne pas supprimer ce proxy** : c'est le `DATABASE_PUBLIC_URL` référencé par les apps. Pour un accès psql ponctuel,
   créer un proxy temporaire séparé et le supprimer après usage.
+- **Domaines personnalisés (16 août 2026)** : `duelpion.com` et `dominotactics.com` achetés sur
+  Hostinger, ajoutés (+ `www`) aux projets Vercel `duelpion-web` et `dominotactics-web` ; env
+  (`NEXT_PUBLIC_APP_URL`, `APP_URL`, `CORS_ORIGINS`) et `game_client.{duelpion,dominotactics}.live`
+  (`launchUrl`/`redirectUrls`) mis à jour, anciennes URLs `*.vercel.app` conservées en fallback dans
+  `redirectUrls`/`CORS_ORIGINS`. Nameservers Hostinger des deux domaines pointés vers
+  `ns1.vercel-dns.com`/`ns2.vercel-dns.com` ; propagation DNS + émission SSL Vercel à reconfirmer
+  (`vercel domains inspect <domaine>`). Détail par jeu : Duelpion
+  [`DEPLOY.md`](../../DUELPION/DEPLOY.md), Domino Tactics [`DEPLOY.md`](../../DOMINO_TACTICS/DEPLOY.md).
 - **Cache turbo** : `turbo.json` → `remoteCache.enabled` + secrets GitHub `TURBO_TOKEN`/`TURBO_TEAM`.
 - Redéploiement Vercel sans commit : bouton *Redeploy* du dashboard, ou CLI depuis le dossier de l'app
   (`vercel --prod --force`). Attention au `rootDirectory` quand on lance depuis un sous-dossier.

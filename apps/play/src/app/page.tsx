@@ -20,7 +20,7 @@ export default async function HomePage() {
       <main className="play-page">
         <section className="play-section" aria-labelledby="games-title">
           <h2 id="games-title">Jeux</h2>
-          <GameGrid games={games} webUrl={webUrl} />
+          <GameGrid games={games} />
         </section>
       </main>
     </>

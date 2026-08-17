@@ -8,7 +8,6 @@ import { getGameVisual } from "@/lib/game-visuals";
 
 interface GameGridProps {
   games: GameClient[];
-  webUrl: string;
 }
 
 function hashSeed(seed: string): number {
@@ -41,7 +40,7 @@ function PlayIcon() {
   );
 }
 
-function GameTile({ game, webUrl, index }: { game: GameClient; webUrl: string; index: number }) {
+function GameTile({ game, index }: { game: GameClient; index: number }) {
   const visual = getGameVisual(game.clientId);
   const hash = hashSeed(game.clientId);
   const rotate = (hash % 16) - 8;
@@ -51,7 +50,7 @@ function GameTile({ game, webUrl, index }: { game: GameClient; webUrl: string; i
   return (
     <motion.a
       className="game-card"
-      href={`${webUrl}/launch/${encodeURIComponent(game.clientId)}?src=play`}
+      href={game.launchUrl}
       style={
         {
           "--accent": visual.accent,
@@ -105,11 +104,11 @@ function GameTile({ game, webUrl, index }: { game: GameClient; webUrl: string; i
   );
 }
 
-export function GameGrid({ games, webUrl }: GameGridProps) {
+export function GameGrid({ games }: GameGridProps) {
   return (
     <div className="play-grid">
       {games.map((game, index) => (
-        <GameTile key={game.clientId} game={game} webUrl={webUrl} index={index} />
+        <GameTile key={game.clientId} game={game} index={index} />
       ))}
     </div>
   );
