@@ -22,6 +22,9 @@
 | 13 | Jeux créés en prod | ✅ | `sandbox` (hidden) + `duelpion` en sandbox **et** live, `walletEnabled=true` |
 | 14 | Repo + CI DUELPION | ✅ | `MurDev/duelpion-web` (main = web app, `legacy-v1` = ancien), Dockerfile serveur |
 | 15 | Déployer DUELPION | ✅ | Front Vercel en ligne (`duelpion-web.vercel.app`) ; serveur Railway sur volume persisté (`duelpion-production.up.railway.app`), lockfile npm 10 en sync |
+| 16 | Wallet : débit comptable correct | ✅ | `applyLedgerMutation` corrigé : `balanceCents` toujours décrémenté du montant entier, bonus consommé **en dernier** (fix du "solde inchangé après défaite" chez LUDOLAKAY) ; tests `wallet.test.ts` |
+| 17 | Domino Tactics : audit intégrité argent + UX | ✅ | Refunds create, sweep des matchs bloqués (60 s), `creditHuman` avec `platformUserId` (retry S2S), création de match bot atomique ; UX : modal abandon (mise perdue + défaite enregistrée), gain net vs IA (`payoutCents`), timer `your_turn`/`opponent_turn`, confirmation de mise + gain potentiel (rake-aware), page règles ; tests d'intégration route layer (116 tests) ; PRs [#20](https://github.com/MurDev/dominotactics-server/pull/20) (server) et [#48](https://github.com/MurDev/dominotactics-web/pull/48) (web) mergées, déployé |
+| 18 | Domino Tactics : fix leaderboard week_start | ✅ | `week_start` déclaré `text` mais comparé à `$1::date` (text = date invalide en PG) → erreurs `ensurePreviousWeekEdition failed` récurrentes en prod ; casts retirés, édition de la semaine créée sans erreur (PR [#21](https://github.com/MurDev/dominotactics-server/pull/21)) |
 
 ## À faire
 
@@ -43,6 +46,22 @@
 
 ## Historique
 
+- **17 août 2026** : audit argent Domino Tactics livré en prod (P0/P1/P2) — refunds create, sweep des
+  matchs bloqués, `creditHuman` avec `platformUserId`, création de match bot atomique ; UX argent :
+  modal abandon (mise perdue + défaite), gain net vs IA, timer, confirmation de mise + gain potentiel
+  (rake), page règles ; 6 tests d'intégration route layer ajoutés (116 au total). PRs serveur #20 et
+  web #48 mergées. Au passage, corrigé le bug leaderboard récurrent (`week_start` text vs `::date`,
+  PR #21). Vérifié en prod via `railway connect Postgres` : migrations toutes appliquées (16 tables),
+  édition `2026-08-10` créée (cachée, `visible=0`, publication admin). Note deploy : l'intégration git
+  Railway a échoué une fois de façon transitoire sur le merge d'une PR, `railway up -y --detach` depuis
+  le repo a redéployé en vert, et le merge suivant a repassé par l'auto-deploy GitHub.
+- **17 août 2026** : correctif comptable wallet — `applyLedgerMutation` débitait le bonus en premier et ne
+  réduisait `balanceCents` que de `montant - bonus` (un joueur avec du bonus perdait sans voir son solde bouger,
+  et le bonus devenait retirable). `computeDebitOutcome` extrait : le solde total diminue toujours du montant
+  entier, le bonus est consommé en dernier. Tests + tsc/vitest verts, PR [#19](https://github.com/MurDev/odfinex-games/pull/19)
+  mergée, déployé Railway. Côté LUDOLAKAY : crédit gagnant `win_{roomId}`, notif de solde à tous les joueurs,
+  script `reconcile-wallet.ts`, remédiation des 2 comptes affectés (`f4eeaba2`, `061c1237`), affichage admin
+  des entrées de réconciliation comme "Mise".
 - **16 août 2026** : domaines personnalisés `duelpion.com` et `dominotactics.com` achetés sur
   Hostinger et connectés (+ `www`) aux projets Vercel `duelpion-web`/`dominotactics-web` ;
   `NEXT_PUBLIC_APP_URL`/`APP_URL`/`CORS_ORIGINS` mis à jour (Vercel + Railway, anciennes URLs
