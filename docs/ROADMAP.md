@@ -29,7 +29,7 @@
 |---|---|---|---|
 | **P1** | **Vérifier le flux S2S complet en prod** | ✅ | Validé : launch → token → mutation wallet signée (non signée 401, mauvais secret 403, timestamp périmé 401), isolation sandbox/live OK |
 | P2 | Domaine personnalisé (plateforme Odfinex) | À faire | `odfinexgames` → web, `play.odfinexgames` → play (Vercel custom domain) |
-| P2a | Domaines personnalisés par jeu | ✅ | `duelpion.com` + `dominotactics.com` achetés (Hostinger) et connectés aux projets Vercel `duelpion-web`/`dominotactics-web` ; DNS/SSL en cours de propagation (16 août 2026) |
+| P2a | Domaines personnalisés par jeu | ✅ | `duelpion.com` + `dominotactics.com` achetés (Hostinger) et connectés aux projets Vercel `duelpion-web`/`dominotactics-web` ; DNS propagé, SSL actif, les deux répondent en 200 (16 août 2026) |
 | P3 | Paiements MonCash | ✅ | Dépôts / retraits Bazik + UI `/wallet` + webhook `/webhooks/bazik` ; mock local sans credentials |
 | P3b | Credit S2S offline | ✅ | `POST /v1/wallet/credit-user` + SDK `creditToUser` (parrainage) |
 | P3c | Credit HMAC obligatoire | ✅ | `requireClientSignature` sur debit **et** credit |
@@ -48,7 +48,8 @@
   `NEXT_PUBLIC_APP_URL`/`APP_URL`/`CORS_ORIGINS` mis à jour (Vercel + Railway, anciennes URLs
   `*.vercel.app` conservées en fallback) ; `game_client.{duelpion,dominotactics}.live` reseedés en
   prod avec les nouveaux `launchUrl`/`redirectUrls` ; nameservers Hostinger des deux domaines
-  pointés vers `ns1/ns2.vercel-dns.com`. Propagation DNS + émission SSL Vercel encore à confirmer.
+  pointés vers `ns1/ns2.vercel-dns.com`. Propagation DNS confirmée, SSL Vercel actif (les deux
+  domaines répondent en 200).
 - **3 août 2026** : NatCash manuel + files dépôt/retrait dual-admin (migration `0006`, admin
   payment-rails / deposit-requests / withdrawal-requests, webhook notify jeux, SDK `0.1.6`).
   Deploy API : préférer `railway up` depuis `main` si `redeploy --from-source` laisse les routes en 404.
