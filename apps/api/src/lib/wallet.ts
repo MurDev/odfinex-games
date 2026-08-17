@@ -66,6 +66,54 @@ export type MutationResult =
       message: string;
     };
 
+export type DebitOutcome =
+  | {
+      ok: true;
+      nextBalance: number;
+      nextBonus: number;
+      entryBonusCents: number;
+    }
+  | {
+      ok: false;
+      code: "INSUFFICIENT_FUNDS";
+      message: string;
+    };
+
+/**
+ * Calcule l'etat du wallet apres un debit.
+ *
+ * Le solde total (balanceCents) diminue toujours du montant entier : le solde
+ * affiche doit refleter la perte, meme si le joueur a du bonus.
+ *
+ * Le bonus est consomme en dernier : un retrait (du retirable = balance minus
+ * bonus) ne doit jamais rendre le bonus retirable en l'erosant, et un joueur
+ * qui perd une mise voit son solde total baisser quoi qu'il en soit.
+ */
+export function computeDebitOutcome(input: {
+  currentBalance: number;
+  currentBonus: number;
+  amountCents: number;
+}): DebitOutcome {
+  const { currentBalance, currentBonus, amountCents } = input;
+
+  if (currentBalance < amountCents) {
+    return {
+      ok: false as const,
+      code: "INSUFFICIENT_FUNDS" as const,
+      message: "Insufficient wallet balance",
+    };
+  }
+
+  const withdrawable = Math.max(0, currentBalance - currentBonus);
+  const bonusToConsume = Math.max(0, amountCents - withdrawable);
+  return {
+    ok: true as const,
+    nextBalance: currentBalance - amountCents,
+    nextBonus: currentBonus - bonusToConsume,
+    entryBonusCents: bonusToConsume === 0 ? 0 : -bonusToConsume,
+  };
+}
+
 export async function applyLedgerMutation(
   input: MutationInput,
 ): Promise<MutationResult> {
@@ -144,20 +192,13 @@ export async function applyLedgerMutation(
     let entryBonusCents = 0;
 
     if (type === "debit") {
-      const bonusToConsume = Math.min(currentBonus, amountCents);
-      const realDebit = amountCents - bonusToConsume;
-
-      if (currentBalance < realDebit) {
-        return {
-          ok: false as const,
-          code: "INSUFFICIENT_FUNDS" as const,
-          message: "Insufficient wallet balance",
-        };
+      const outcome = computeDebitOutcome({ currentBalance, currentBonus, amountCents });
+      if (!outcome.ok) {
+        return outcome;
       }
-
-      nextBalance = currentBalance - realDebit;
-      nextBonus = currentBonus - bonusToConsume;
-      entryBonusCents = -bonusToConsume;
+      nextBalance = outcome.nextBalance;
+      nextBonus = outcome.nextBonus;
+      entryBonusCents = outcome.entryBonusCents;
     } else {
       nextBalance = currentBalance + amountCents;
       const bonusDelta = Math.max(0, Math.min(bonusCents, amountCents));
