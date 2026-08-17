@@ -22,6 +22,7 @@
 | 13 | Jeux créés en prod | ✅ | `sandbox` (hidden) + `duelpion` en sandbox **et** live, `walletEnabled=true` |
 | 14 | Repo + CI DUELPION | ✅ | `MurDev/duelpion-web` (main = web app, `legacy-v1` = ancien), Dockerfile serveur |
 | 15 | Déployer DUELPION | ✅ | Front Vercel en ligne (`duelpion-web.vercel.app`) ; serveur Railway sur volume persisté (`duelpion-production.up.railway.app`), lockfile npm 10 en sync |
+| 16 | Wallet : débit comptable correct | ✅ | `applyLedgerMutation` corrigé : `balanceCents` toujours décrémenté du montant entier, bonus consommé **en dernier** (fix du "solde inchangé après défaite" chez LUDOLAKAY) ; tests `wallet.test.ts` |
 
 ## À faire
 
@@ -43,6 +44,13 @@
 
 ## Historique
 
+- **17 août 2026** : correctif comptable wallet — `applyLedgerMutation` débitait le bonus en premier et ne
+  réduisait `balanceCents` que de `montant - bonus` (un joueur avec du bonus perdait sans voir son solde bouger,
+  et le bonus devenait retirable). `computeDebitOutcome` extrait : le solde total diminue toujours du montant
+  entier, le bonus est consommé en dernier. Tests + tsc/vitest verts, PR [#19](https://github.com/MurDev/odfinex-games/pull/19)
+  mergée, déployé Railway. Côté LUDOLAKAY : crédit gagnant `win_{roomId}`, notif de solde à tous les joueurs,
+  script `reconcile-wallet.ts`, remédiation des 2 comptes affectés (`f4eeaba2`, `061c1237`), affichage admin
+  des entrées de réconciliation comme "Mise".
 - **16 août 2026** : domaines personnalisés `duelpion.com` et `dominotactics.com` achetés sur
   Hostinger et connectés (+ `www`) aux projets Vercel `duelpion-web`/`dominotactics-web` ;
   `NEXT_PUBLIC_APP_URL`/`APP_URL`/`CORS_ORIGINS` mis à jour (Vercel + Railway, anciennes URLs
