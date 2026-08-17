@@ -55,6 +55,13 @@
   édition `2026-08-10` créée (cachée, `visible=0`, publication admin). Note deploy : l'intégration git
   Railway a échoué une fois de façon transitoire sur le merge d'une PR, `railway up -y --detach` depuis
   le repo a redéployé en vert, et le merge suivant a repassé par l'auto-deploy GitHub.
+- **17 août 2026** : API S2S exposée aux jeux : `/v1/client/transactions` renvoie désormais
+  `withdrawalStatus` (statut du `withdrawal_request` lié aux hold debit / refund / reject / cancel),
+  ainsi que `bonusCents` et `category` pour distinguer bonus, récompenses hebdo et dons des dépôts
+  simples ; `/v1/wallet` et `/v1/client/balance` exposent `bonusCents` pour que les clients affichent
+  un solde retirable = solde - bonus. PR [#21](https://github.com/MurDev/odfinex-games/pull/21)
+  mergée, déployé Railway. Côté LUDOLAKAY : retraits en attente affichés correctement (plus "approuvé"),
+  bonus non retirable affiché en "Bonus bloque", récompenses hebdo libellées "Recompense hebdo".
 - **17 août 2026** : correctif comptable wallet — `applyLedgerMutation` débitait le bonus en premier et ne
   réduisait `balanceCents` que de `montant - bonus` (un joueur avec du bonus perdait sans voir son solde bouger,
   et le bonus devenait retirable). `computeDebitOutcome` extrait : le solde total diminue toujours du montant

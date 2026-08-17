@@ -120,7 +120,7 @@ Prérequis : `game_client.walletEnabled === true`, un launch token valide, et `c
 
 ```ts
 const bal = await client.getBalance();
-// { balanceCents: number, currency: "HTG" }
+// { balanceCents: number, bonusCents: number, currency: "HTG" }
 
 const history = await client.getTransactions({ limit: 50 });
 // { items: LedgerEntry[], total }
