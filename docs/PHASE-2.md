@@ -52,7 +52,7 @@ Erreurs : `INSUFFICIENT_FUNDS`, `IDEMPOTENCY_CONFLICT`, `GAME_NOT_ALLOWED`, `UNA
 ### SDK
 
 ```ts
-await client.getBalance(); // { balanceCents, currency: "HTG" }
+await client.getBalance(); // { balanceCents, bonusCents, currency: "HTG" }
 await client.debit({ amountCents, reason, referenceId });
 await client.credit({ amountCents, reason, referenceId });
 ```
