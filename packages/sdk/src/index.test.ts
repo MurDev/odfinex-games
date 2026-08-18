@@ -36,6 +36,7 @@ describe("OdfinexGamesClient", () => {
           user: {
             id: "u1",
             displayName: "Ada",
+            username: "ada",
             email: "ada@example.com",
             avatarUrl: null,
             createdAt: "2026-01-01T00:00:00.000Z",
@@ -91,7 +92,9 @@ describe("OdfinexGamesClient", () => {
   it("getBalance returns HTG cents", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json({ balanceCents: 1500, currency: "HTG" })),
+      vi.fn(async () =>
+        Response.json({ balanceCents: 1500, bonusCents: 0, currency: "HTG" }),
+      ),
     );
     const client = new OdfinexGamesClient({
       baseUrl: "http://localhost:4000",
@@ -99,7 +102,7 @@ describe("OdfinexGamesClient", () => {
       sessionToken: "tok",
     });
     const bal = await client.getBalance();
-    expect(bal).toEqual({ balanceCents: 1500, currency: "HTG" });
+    expect(bal).toEqual({ balanceCents: 1500, bonusCents: 0, currency: "HTG" });
   });
 
   it("getTransactions calls wallet transactions with Bearer token", async () => {
@@ -112,11 +115,13 @@ describe("OdfinexGamesClient", () => {
             id: "tx1",
             type: "credit",
             amountCents: 1000,
+            bonusCents: 0,
             balanceAfterCents: 1000,
             reason: "moncash_deposit",
             clientId: "platform",
             environment: "live",
             referenceId: "dep_1",
+            category: "deposit",
             createdAt: "2026-08-03T00:00:00.000Z",
           },
         ],
@@ -184,7 +189,7 @@ describe("OdfinexGamesClient", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        Response.json({ txId: "t1", balanceCents: 200, currency: "HTG" }),
+        Response.json({ txId: "t1", balanceCents: 200, bonusCents: 0, currency: "HTG" }),
       ),
     );
     const client = new OdfinexGamesClient({
@@ -208,7 +213,7 @@ describe("OdfinexGamesClient", () => {
       expect(headers["x-client-id"]).toBe("duelpion.live");
       expect(headers["x-client-secret"]).toBe("sec");
       expect(headers["x-client-signature"]).toBeTruthy();
-      return Response.json({ txId: "t2", balanceCents: 50, currency: "HTG" });
+      return Response.json({ txId: "t2", balanceCents: 50, bonusCents: 0, currency: "HTG" });
     });
     vi.stubGlobal("fetch", fetchMock);
 
