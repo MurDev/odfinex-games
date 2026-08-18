@@ -71,14 +71,18 @@ async function resolveWalletContext(c: {
   req: {
     header: (name: string) => string | undefined;
   };
-}): Promise<{ userId: string; environment: WalletEnvironment } | null> {
+}): Promise<{ userId: string; environment: WalletEnvironment; clientId: string | null } | null> {
   const auth = c.req.header("authorization");
   const [scheme, token] = auth?.split(" ") ?? [];
   const cookie = c.req.header("cookie");
 
   if (scheme?.toLowerCase() === "bearer" && token) {
     const launchRow = await db
-      .select({ userId: launchTokens.userId, environment: gameClients.environment })
+      .select({
+        userId: launchTokens.userId,
+        environment: gameClients.environment,
+        clientId: launchTokens.clientId,
+      })
       .from(launchTokens)
       .innerJoin(gameClients, eq(launchTokens.clientId, gameClients.clientId))
       .where(
@@ -90,7 +94,11 @@ async function resolveWalletContext(c: {
       .limit(1)
       .then((rows) => rows[0] ?? null);
     if (launchRow) {
-      return { userId: launchRow.userId, environment: launchRow.environment };
+      return {
+        userId: launchRow.userId,
+        environment: launchRow.environment,
+        clientId: launchRow.clientId,
+      };
     }
 
     const sess = await db
@@ -99,7 +107,7 @@ async function resolveWalletContext(c: {
       .where(and(eq(sessions.sessionToken, token), gt(sessions.expires, new Date())))
       .limit(1)
       .then((rows) => rows[0] ?? null);
-    if (sess) return { userId: sess.userId, environment: "live" };
+    if (sess) return { userId: sess.userId, environment: "live", clientId: null };
   }
 
   if (cookie) {
@@ -129,7 +137,7 @@ async function resolveWalletContext(c: {
         )
         .limit(1)
         .then((rows) => rows[0] ?? null);
-      if (sess) return { userId: sess.userId, environment: "live" };
+      if (sess) return { userId: sess.userId, environment: "live", clientId: null };
     }
   }
 
@@ -894,9 +902,14 @@ walletRoutes.get("/wallet/transactions", async (c) => {
 
   await ensureWallet(ctx.userId, ctx.environment);
 
+  const clientFilter = ctx.clientId
+    ? sql`(${ledgerEntries.clientId} = ${ctx.clientId} OR ${ledgerEntries.clientId} = 'platform')`
+    : eq(ledgerEntries.clientId, "platform");
+
   const whereClause = and(
     eq(ledgerEntries.userId, ctx.userId),
     eq(ledgerEntries.environment, ctx.environment),
+    clientFilter,
   );
 
   const items = await db
