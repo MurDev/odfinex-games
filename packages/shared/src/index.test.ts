@@ -10,6 +10,7 @@ describe("shared schemas", () => {
     const user = UserSchema.parse({
       id: "u1",
       displayName: "Ada",
+      username: "ada",
       email: "ada@example.com",
       avatarUrl: "https://example.com/a.png",
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -29,6 +30,7 @@ describe("shared schemas", () => {
       user: {
         id: "u1",
         displayName: null,
+        username: null,
         email: "a@b.co",
         avatarUrl: null,
         createdAt: "2026-01-01T00:00:00.000Z",

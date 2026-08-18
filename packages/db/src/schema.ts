@@ -17,6 +17,8 @@ export const users = pgTable("user", {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name"),
+  /** Handle unique across the whole Odfinex platform, shared by every game. */
+  username: text("username").unique(),
   email: text("email").notNull().unique(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),

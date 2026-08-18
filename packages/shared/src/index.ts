@@ -12,6 +12,7 @@ export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 export const UserSchema = z.object({
   id: z.string(),
   displayName: z.string().nullable(),
+  username: z.string().nullable(),
   email: z.string().email().nullable(),
   avatarUrl: z.string().url().nullable(),
   isAdmin: z.boolean().optional(),
@@ -20,6 +21,25 @@ export const UserSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+
+export const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
+
+export const UpdateUsernameRequestSchema = z.object({
+  username: z
+    .string()
+    .regex(
+      USERNAME_PATTERN,
+      "Username must be 3-20 characters: lowercase letters, digits, or underscores",
+    ),
+});
+
+export type UpdateUsernameRequest = z.infer<typeof UpdateUsernameRequestSchema>;
+
+export const UpdateUsernameResponseSchema = z.object({
+  username: z.string(),
+});
+
+export type UpdateUsernameResponse = z.infer<typeof UpdateUsernameResponseSchema>;
 
 export const ApiErrorSchema = z.object({
   error: z.object({

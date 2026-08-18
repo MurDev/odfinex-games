@@ -6,6 +6,7 @@ import {
   ClientBotCreateResponseSchema,
   ClientTransactionsResponseSchema,
   SessionResponseSchema,
+  UpdateUsernameResponseSchema,
   WalletBalanceSchema,
   WalletDepositCompleteResponseSchema,
   WalletDepositResponseSchema,
@@ -16,6 +17,7 @@ import {
   type ClientBotCreateResponse,
   type ClientTransactionsResponse,
   type SessionResponse,
+  type UpdateUsernameResponse,
   type User,
   type WalletBalance,
   type WalletMutationRequest,
@@ -148,6 +150,26 @@ export class OdfinexGamesClient {
     }
 
     return SessionResponseSchema.parse(await res.json());
+  }
+
+  /** Update the player's platform-wide username, shared across every Odfinex game. */
+  async updateUsername(username: string): Promise<UpdateUsernameResponse> {
+    const token = this.requireToken();
+    const res = await fetch(`${this.baseUrl}/v1/me/username`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username }),
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `PATCH /v1/me/username failed (${res.status})`);
+    }
+
+    return UpdateUsernameResponseSchema.parse(await res.json());
   }
 
   async getBalance(): Promise<WalletBalance> {

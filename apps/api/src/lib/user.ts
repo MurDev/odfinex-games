@@ -7,6 +7,7 @@ export function toPublicUser(row: DbUser): User {
   return {
     id: row.id,
     displayName: row.name,
+    username: row.username,
     email: row.email,
     avatarUrl: row.image && row.image.length > 0 ? row.image : null,
     isAdmin: row.isAdmin,
