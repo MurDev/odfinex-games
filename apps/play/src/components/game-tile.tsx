@@ -40,6 +40,12 @@ function PlayIcon() {
   );
 }
 
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
+
+function launchHref(clientId: string): string {
+  return `${WEB_URL}/launch/${encodeURIComponent(clientId)}?src=play`;
+}
+
 function GameTile({ game, index }: { game: GameClient; index: number }) {
   const visual = getGameVisual(game.clientId);
   const hash = hashSeed(game.clientId);
@@ -50,7 +56,7 @@ function GameTile({ game, index }: { game: GameClient; index: number }) {
   return (
     <motion.a
       className="game-card"
-      href={game.launchUrl}
+      href={launchHref(game.clientId)}
       style={
         {
           "--accent": visual.accent,
