@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { RejectDialog } from "@/components/reject-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { NatcashFeeDialog } from "@/components/natcash-fee-dialog";
 import { formatHtg } from "@/lib/api";
 
 type WithdrawalRequestActionsProps = {
@@ -72,7 +73,14 @@ export function WithdrawalRequestActions({
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-2">
-        {isSelf ? (
+        {method === "natcash" ? (
+          <NatcashFeeDialog
+            withdrawalId={id}
+            amountCents={amountCents}
+            displayName={displayName ?? email}
+            isSelf={isSelf}
+          />
+        ) : isSelf ? (
           <ConfirmDialog
             trigger={
               <Button size="sm" disabled={busy}>

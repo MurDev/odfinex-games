@@ -16,6 +16,7 @@ import {
   Landmark,
   Inbox,
   Banknote,
+  PiggyBank,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,7 @@ export function AdminLayout({
     {
       title: "Finance",
       items: [
+        { label: "Tableau de bord finance", href: "/finance", icon: PiggyBank },
         { label: "Payment rails", href: "/payment-rails", icon: Landmark },
         { label: "Depots NatCash", href: "/deposit-requests", icon: Inbox, badge: pendingDeposits },
         { label: "Retraits", href: "/withdrawal-requests", icon: Banknote, badge: pendingWithdrawals },

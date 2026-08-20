@@ -32,6 +32,7 @@ export default async function DashboardPage() {
     totalVolumeCents: 0,
     pendingDeposits: 0,
     pendingWithdrawals: 0,
+    totalRakeCents: 0,
   };
   let error: string | null = null;
 

@@ -301,6 +301,32 @@ export async function withdrawToMoncash(
   return normalizeWithdrawResponse(raw);
 }
 
+export interface BalanceResponse {
+  available: number;
+  reserved: number;
+  currency: string;
+  environment: string;
+}
+
+export async function getBalance(): Promise<BalanceResponse> {
+  if (isBazikMock()) {
+    return { available: 0, reserved: 0, currency: "HTG", environment: "mock" };
+  }
+
+  const headers = await authHeaders();
+  const res = await bazikFetch(`${BASE_URL}/balance`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Bazik getBalance failed (${res.status}): ${text}`);
+  }
+
+  return (await res.json()) as BalanceResponse;
+}
+
 export function verifyWebhookSignatureWithReason(
   rawBody: string,
   signature: string,

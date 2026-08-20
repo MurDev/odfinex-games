@@ -5,6 +5,7 @@ import {
   ClientBalancesResponseSchema,
   ClientBotCreateResponseSchema,
   ClientTransactionsResponseSchema,
+  RakeEventCreateResponseSchema,
   SessionResponseSchema,
   UpdateUsernameResponseSchema,
   WalletBalanceSchema,
@@ -16,6 +17,7 @@ import {
   type ClientBalancesResponse,
   type ClientBotCreateResponse,
   type ClientTransactionsResponse,
+  type RakeEventCreateResponse,
   type SessionResponse,
   type UpdateUsernameResponse,
   type User,
@@ -436,6 +438,48 @@ export class OdfinexGamesClient {
   }
 
   /**
+   * S2S record the rake taken on a settled match. Pure analytics event — never
+   * moves wallet money. Idempotent on (clientId, referenceId): safe to retry.
+   * Requires `clientSecret`.
+   */
+  async recordRake(input: {
+    amountCents: number;
+    referenceId: string;
+    reason?: string;
+  }): Promise<RakeEventCreateResponse> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(
+        401,
+        "MISSING_CLIENT_SECRET",
+        "clientSecret is required for recordRake",
+      );
+    }
+
+    const timestamp = Date.now().toString();
+    const body = JSON.stringify(input);
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+
+    const res = await fetch(`${this.baseUrl}/v1/client/rake`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "x-client-id": this.clientId,
+        "x-client-secret": this.clientSecret,
+        "x-timestamp": timestamp,
+        "x-client-signature": signature,
+      },
+      body,
+    });
+
+    if (!res.ok) {
+      return this.parseError(res, `POST /v1/client/rake failed (${res.status})`);
+    }
+
+    return RakeEventCreateResponseSchema.parse(await res.json());
+  }
+
+  /**
    * Start a MonCash deposit. Returns Bazik `redirectUrl` — send the player there directly.
    * Requires launch token. Does not need clientSecret.
    */
@@ -837,6 +881,8 @@ export {
   ClientBalancesResponseSchema,
   ClientBotCreateRequestSchema,
   ClientBotCreateResponseSchema,
+  RakeEventCreateRequestSchema,
+  RakeEventCreateResponseSchema,
   WalletWithdrawResponseSchema,
   type HealthResponse,
   type User,
@@ -855,6 +901,8 @@ export {
   type ClientBalanceEntry,
   type ClientBotCreateRequest,
   type ClientBotCreateResponse,
+  type RakeEventCreateRequest,
+  type RakeEventCreateResponse,
   type WalletWithdrawRequest,
   type WalletWithdrawResponse,
   type LedgerEntry,

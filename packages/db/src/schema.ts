@@ -207,6 +207,8 @@ export const withdrawalRequests = pgTable(
     status: text("status").notNull().default("pending"), // pending | processing | successful | failed | cancelled
     referenceId: text("reference_id").notNull().unique(),
     providerTxId: text("provider_tx_id"),
+    /** Real NatCash P2P transfer fee paid by the operator, in cents. Required when approving a natcash withdrawal; null/irrelevant for moncash (fee is fixed and handled by Bazik). */
+    feeCents: integer("fee_cents"),
     environment: environmentEnum("environment").notNull().default("live"),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     completedAt: timestamp("completed_at", { mode: "date" }),
@@ -265,5 +267,37 @@ export const manualDepositRequests = pgTable("manual_deposit_request", {
 /** Processed Bazik webhook event ids (idempotency) */
 export const webhookEvents = pgTable("webhook_event", {
   id: text("id").primaryKey(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+/**
+ * Explicit rake/commission record — one per settled match, reported by the game via S2S.
+ * Pure analytics: never moves wallet money (the winner's payout is already net of rake).
+ * Idempotent on (clientId, referenceId), same shape as ledger_entry's idempotency key.
+ */
+export const rakeEvents = pgTable(
+  "rake_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    clientId: text("client_id").notNull(),
+    environment: environmentEnum("environment").notNull().default("live"),
+    amountCents: integer("amount_cents").notNull(),
+    referenceId: text("reference_id").notNull(),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [unique("rake_event_client_ref_unique").on(table.clientId, table.referenceId)],
+);
+
+/** Admin-declared NatCash account balance snapshots, used to reconcile drift against the computed balance. */
+export const natcashBalanceSnapshots = pgTable("natcash_balance_snapshot", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  balanceCents: integer("balance_cents").notNull(),
+  note: text("note"),
+  createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });

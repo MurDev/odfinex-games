@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { RejectDialog } from "@/components/reject-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { NatcashFeeDialog } from "@/components/natcash-fee-dialog";
 import { formatHtg } from "@/lib/api";
 import type { AdminWithdrawalRequest } from "@odfinex/shared";
 
@@ -54,7 +55,14 @@ export function WithdrawalRequestRowActions({ item }: { item: AdminWithdrawalReq
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center justify-end gap-2">
-        {item.isSelf ? (
+        {item.method === "natcash" ? (
+          <NatcashFeeDialog
+            withdrawalId={item.id}
+            amountCents={item.amountCents}
+            displayName={item.displayName ?? item.email}
+            isSelf={item.isSelf}
+          />
+        ) : item.isSelf ? (
           <ConfirmDialog
             trigger={
               <Button size="sm" disabled={busy}>

@@ -1,12 +1,20 @@
 import { Hono } from "hono";
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { AdminUserCreateSchema, AdminUserCreditSchema, AdminUserDebitSchema } from "@odfinex/shared";
+import {
+  AdminNatcashSnapshotCreateSchema,
+  AdminUserCreateSchema,
+  AdminUserCreditSchema,
+  AdminUserDebitSchema,
+  AdminWithdrawalApproveRequestSchema,
+} from "@odfinex/shared";
 import {
   gameClients,
   ledgerEntries,
   manualDepositRequests,
+  natcashBalanceSnapshots,
   paymentRailConfigs,
+  rakeEvents,
   sessions,
   users,
   walletAccounts,
@@ -24,6 +32,7 @@ import { notifyGameWalletEvent } from "../lib/notify-game.js";
 import {
   BazikNetworkError,
   classifyWithdrawOutcome,
+  getBalance as getBazikBalance,
   splitFullName,
   withdrawToMoncash,
 } from "../payments/bazik.js";
@@ -100,6 +109,9 @@ adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) 
     .select({ count: sql<number>`count(*)::int` })
     .from(withdrawalRequests)
     .where(eq(withdrawalRequests.status, "pending"));
+  const [rakeRow] = await db
+    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .from(rakeEvents);
 
   return c.json({
     totalAccounts: accountCount?.count ?? 0,
@@ -111,8 +123,142 @@ adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) 
     totalVolumeCents: volumeRow?.total ?? 0,
     pendingDeposits: pendingDeposits?.count ?? 0,
     pendingWithdrawals: pendingWithdrawals?.count ?? 0,
+    totalRakeCents: rakeRow?.total ?? 0,
   });
 });
+
+/* ── Finance dashboard ── */
+
+adminRoutes.get("/admin/finance/rake", requirePlatformSession, requireAdmin, async (c) => {
+  const [totalRow] = await db
+    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .from(rakeEvents);
+
+  const rakeGameNameSub = db
+    .select({ name: gameClients.name })
+    .from(gameClients)
+    .where(eq(gameClients.clientId, rakeEvents.clientId))
+    .limit(1);
+  const rakeGameName = sql<string | null>`${rakeGameNameSub}`;
+
+  const byGame = await db
+    .select({
+      clientId: rakeEvents.clientId,
+      gameName: rakeGameName,
+      totalRakeCents: sql<number>`coalesce(sum(${rakeEvents.amountCents}),0)::int`,
+      eventCount: sql<number>`count(*)::int`,
+    })
+    .from(rakeEvents)
+    .groupBy(rakeEvents.clientId)
+    .orderBy(desc(sql`coalesce(sum(${rakeEvents.amountCents}),0)`));
+
+  return c.json({
+    totalRakeCents: totalRow?.total ?? 0,
+    byGame,
+  });
+});
+
+adminRoutes.get(
+  "/admin/finance/bazik-balance",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    try {
+      const balance = await getBazikBalance();
+      return c.json(balance);
+    } catch (err) {
+      return apiError(
+        c,
+        502,
+        "BAZIK_BALANCE_FAILED",
+        err instanceof Error ? err.message : "Failed to fetch Bazik balance",
+      );
+    }
+  },
+);
+
+adminRoutes.get(
+  "/admin/finance/natcash-balance",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const [depositsRow] = await db
+      .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+      .from(manualDepositRequests)
+      .where(eq(manualDepositRequests.status, "approved"));
+
+    const [withdrawalsRow] = await db
+      .select({
+        totalAmount: sql<number>`coalesce(sum(amount_cents),0)::int`,
+        totalFees: sql<number>`coalesce(sum(fee_cents),0)::int`,
+      })
+      .from(withdrawalRequests)
+      .where(
+        and(eq(withdrawalRequests.method, "natcash"), eq(withdrawalRequests.status, "successful")),
+      );
+
+    const totalDepositsCents = depositsRow?.total ?? 0;
+    const totalWithdrawalsCents = withdrawalsRow?.totalAmount ?? 0;
+    const totalFeesCents = withdrawalsRow?.totalFees ?? 0;
+    const computedBalanceCents = totalDepositsCents - totalWithdrawalsCents - totalFeesCents;
+
+    const [lastSnapshot] = await db
+      .select()
+      .from(natcashBalanceSnapshots)
+      .orderBy(desc(natcashBalanceSnapshots.createdAt))
+      .limit(1);
+
+    return c.json({
+      computedBalanceCents,
+      totalDepositsCents,
+      totalWithdrawalsCents,
+      totalFeesCents,
+      lastSnapshot: lastSnapshot
+        ? {
+            balanceCents: lastSnapshot.balanceCents,
+            note: lastSnapshot.note,
+            createdBy: lastSnapshot.createdBy,
+            createdAt: lastSnapshot.createdAt.toISOString(),
+          }
+        : null,
+      driftCents: lastSnapshot ? computedBalanceCents - lastSnapshot.balanceCents : null,
+    });
+  },
+);
+
+adminRoutes.post(
+  "/admin/finance/natcash-balance/snapshot",
+  requirePlatformSession,
+  requireAdmin,
+  async (c) => {
+    const admin = c.get("user");
+    const body = await c.req.json().catch(() => null);
+    const parsed = AdminNatcashSnapshotCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError(c, 400, "INVALID_BODY", "Invalid snapshot request");
+    }
+
+    const [created] = await db
+      .insert(natcashBalanceSnapshots)
+      .values({
+        balanceCents: parsed.data.balanceCents,
+        note: parsed.data.note ?? null,
+        createdBy: admin.id,
+      })
+      .returning();
+
+    return c.json(
+      {
+        id: created!.id,
+        balanceCents: created!.balanceCents,
+        note: created!.note,
+        createdBy: created!.createdBy,
+        createdAt: created!.createdAt.toISOString(),
+      },
+      201,
+    );
+  },
+);
 
 /* ── Games ── */
 
@@ -1253,6 +1399,7 @@ adminRoutes.get("/admin/withdrawal-requests", requirePlatformSession, requireAdm
       environment: withdrawalRequests.environment,
       referenceId: withdrawalRequests.referenceId,
       providerTxId: withdrawalRequests.providerTxId,
+      feeCents: withdrawalRequests.feeCents,
       reviewedBy: withdrawalRequests.reviewedBy,
       reviewedAt: withdrawalRequests.reviewedAt,
       createdAt: withdrawalRequests.createdAt,
@@ -1319,6 +1466,7 @@ adminRoutes.get(
         environment: withdrawalRequests.environment,
         referenceId: withdrawalRequests.referenceId,
         providerTxId: withdrawalRequests.providerTxId,
+        feeCents: withdrawalRequests.feeCents,
         reviewedBy: withdrawalRequests.reviewedBy,
         reviewedAt: withdrawalRequests.reviewedAt,
         createdAt: withdrawalRequests.createdAt,
@@ -1396,10 +1544,22 @@ adminRoutes.post(
     const method = row.method || "moncash";
 
     if (method === "natcash") {
+      const body = await c.req.json().catch(() => null);
+      const parsed = AdminWithdrawalApproveRequestSchema.safeParse(body ?? {});
+      if (!parsed.success || parsed.data.feeCents == null) {
+        return apiError(
+          c,
+          400,
+          "FEE_REQUIRED",
+          "feeCents is required to approve a natcash withdrawal (the real NatCash P2P transfer fee you paid)",
+        );
+      }
+
       await db
         .update(withdrawalRequests)
         .set({
           status: "successful",
+          feeCents: parsed.data.feeCents,
           reviewedBy: admin.id,
           reviewedAt: new Date(),
           completedAt: new Date(),

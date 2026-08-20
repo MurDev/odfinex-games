@@ -17,6 +17,7 @@ import {
   ClientBalancesRequestSchema,
   ClientBotCreateRequestSchema,
   ManualDepositRequestCreateSchema,
+  RakeEventCreateRequestSchema,
   WalletCreditUserRequestSchema,
   WalletDepositRequestSchema,
   WalletGrantRequestSchema,
@@ -26,6 +27,7 @@ import {
 
 import { db } from "../db.js";
 import { apiError } from "../lib/errors.js";
+import { recordRakeEvent } from "../lib/rake.js";
 import { hashToken } from "../lib/tokens.js";
 import {
   applyLedgerMutation,
@@ -570,6 +572,42 @@ s2s.post("/client/bots", requireS2SClientAuth, async (c) => {
     },
     201,
   );
+});
+
+/**
+ * S2S rake recording: a game reports the rake it took on a settled match.
+ * Pure analytics event, never moves wallet money. Idempotent on (clientId, referenceId).
+ */
+s2s.post("/client/rake", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const environment = c.get("environment");
+  const rawBody = c.get("rawBody");
+
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return apiError(c, 400, "INVALID_BODY", "Invalid JSON body");
+  }
+
+  const parsed = RakeEventCreateRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return apiError(c, 400, "INVALID_BODY", "Invalid rake event request");
+  }
+
+  const result = await recordRakeEvent({
+    clientId,
+    environment,
+    amountCents: parsed.data.amountCents,
+    referenceId: parsed.data.referenceId,
+    reason: parsed.data.reason,
+  });
+
+  if (!result.ok) {
+    return apiError(c, 409, result.code, result.message);
+  }
+
+  return c.json({ ok: true as const, id: result.id, replay: result.replay });
 });
 
 /**

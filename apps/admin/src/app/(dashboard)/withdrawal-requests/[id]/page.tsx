@@ -160,6 +160,14 @@ export default async function WithdrawalRequestDetailPage({
             <p className="text-xs text-muted-foreground">Reference provider</p>
             <p className="text-sm font-medium">{request.providerTxId ?? "—"}</p>
           </div>
+          {request.method === "natcash" && (
+            <div>
+              <p className="text-xs text-muted-foreground">Frais NatCash paye</p>
+              <p className="text-sm font-medium">
+                {request.feeCents != null ? formatHtg(request.feeCents) : "—"}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-muted-foreground">Commentaire</p>
             <p className="text-sm font-medium">{request.adminComment ?? "—"}</p>

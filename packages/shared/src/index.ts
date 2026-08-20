@@ -309,9 +309,66 @@ export const AdminStatsSchema = z.object({
   totalVolumeCents: z.number().int().nonnegative(),
   pendingDeposits: z.number().int().nonnegative(),
   pendingWithdrawals: z.number().int().nonnegative(),
+  totalRakeCents: z.number().int().nonnegative(),
 });
 
 export type AdminStats = z.infer<typeof AdminStatsSchema>;
+
+export const AdminRakeBreakdownEntrySchema = z.object({
+  clientId: z.string(),
+  gameName: z.string().nullable(),
+  totalRakeCents: z.number().int().nonnegative(),
+  eventCount: z.number().int().nonnegative(),
+});
+
+export type AdminRakeBreakdownEntry = z.infer<typeof AdminRakeBreakdownEntrySchema>;
+
+export const AdminRakeStatsSchema = z.object({
+  totalRakeCents: z.number().int().nonnegative(),
+  byGame: z.array(AdminRakeBreakdownEntrySchema),
+});
+
+export type AdminRakeStats = z.infer<typeof AdminRakeStatsSchema>;
+
+export const AdminNatcashBalanceSchema = z.object({
+  computedBalanceCents: z.number().int(),
+  totalDepositsCents: z.number().int().nonnegative(),
+  totalWithdrawalsCents: z.number().int().nonnegative(),
+  totalFeesCents: z.number().int().nonnegative(),
+  lastSnapshot: z
+    .object({
+      balanceCents: z.number().int(),
+      note: z.string().nullable(),
+      createdBy: z.string(),
+      createdAt: z.string(),
+    })
+    .nullable(),
+  driftCents: z.number().int().nullable(),
+});
+
+export type AdminNatcashBalance = z.infer<typeof AdminNatcashBalanceSchema>;
+
+export const AdminNatcashSnapshotCreateSchema = z.object({
+  balanceCents: z.number().int().nonnegative(),
+  note: z.string().max(500).optional(),
+});
+
+export type AdminNatcashSnapshotCreate = z.infer<typeof AdminNatcashSnapshotCreateSchema>;
+
+export const AdminBazikBalanceSchema = z.object({
+  available: z.number(),
+  reserved: z.number(),
+  currency: z.string(),
+  environment: z.string(),
+});
+
+export type AdminBazikBalance = z.infer<typeof AdminBazikBalanceSchema>;
+
+export const AdminWithdrawalApproveRequestSchema = z.object({
+  feeCents: z.number().int().nonnegative().optional(),
+});
+
+export type AdminWithdrawalApproveRequest = z.infer<typeof AdminWithdrawalApproveRequestSchema>;
 
 export const AdminGameStatsSchema = z.object({
   clientId: z.string(),
@@ -484,6 +541,8 @@ export const AdminWithdrawalRequestSchema = z.object({
   environment: WalletEnvironmentSchema,
   referenceId: z.string(),
   providerTxId: z.string().nullable(),
+  /** Real NatCash P2P transfer fee paid, in cents. Only set for approved natcash withdrawals. */
+  feeCents: z.number().int().nonnegative().nullable(),
   reviewedBy: z.string().nullable(),
   reviewedByName: z.string().nullable(),
   reviewedAt: z.string().nullable(),
@@ -531,6 +590,22 @@ export const ClientBalancesResponseSchema = z.object({
 });
 
 export type ClientBalancesResponse = z.infer<typeof ClientBalancesResponseSchema>;
+
+export const RakeEventCreateRequestSchema = z.object({
+  amountCents: z.number().int().positive(),
+  referenceId: z.string().min(1).max(128),
+  reason: z.string().min(1).max(128).optional(),
+});
+
+export type RakeEventCreateRequest = z.infer<typeof RakeEventCreateRequestSchema>;
+
+export const RakeEventCreateResponseSchema = z.object({
+  ok: z.literal(true),
+  id: z.string(),
+  replay: z.boolean(),
+});
+
+export type RakeEventCreateResponse = z.infer<typeof RakeEventCreateResponseSchema>;
 
 export const ClientBotCreateRequestSchema = z.object({
   name: z.string().min(1).max(64),
