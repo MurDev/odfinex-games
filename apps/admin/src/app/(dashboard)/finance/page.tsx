@@ -13,6 +13,15 @@ import { Wallet, Landmark, PiggyBank, TrendingDown, TrendingUp, ArrowDownToLine,
 import Link from "next/link";
 import { NatcashSnapshotForm } from "./natcash-snapshot-form";
 
+function TrackedSince({ date }: { date?: string | null }) {
+  if (!date) return <p className="text-xs text-muted-foreground">Aucune donnee</p>;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Depuis le {new Date(date).toLocaleDateString()}
+    </p>
+  );
+}
+
 async function safeFetch<T>(path: string): Promise<{ data: T | null; error: string | null }> {
   try {
     return { data: await adminServerFetch<T>(path), error: null };
@@ -102,6 +111,7 @@ export default async function FinancePage() {
                 <div className="text-lg font-semibold">
                   {formatHtg(overview.data?.totalMoncashDepositsCents ?? 0)}
                 </div>
+                <TrackedSince date={overview.data?.trackedSince.moncashDeposits} />
               </div>
               <div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -110,6 +120,7 @@ export default async function FinancePage() {
                 <div className="text-lg font-semibold">
                   {formatHtg(overview.data?.totalMoncashWithdrawalsCents ?? 0)}
                 </div>
+                <TrackedSince date={overview.data?.trackedSince.moncashWithdrawals} />
               </div>
               <div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -118,6 +129,7 @@ export default async function FinancePage() {
                 <div className="text-lg font-semibold">
                   {formatHtg(overview.data?.totalNatcashDepositsCents ?? 0)}
                 </div>
+                <TrackedSince date={overview.data?.trackedSince.natcashDeposits} />
               </div>
               <div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -126,9 +138,16 @@ export default async function FinancePage() {
                 <div className="text-lg font-semibold">
                   {formatHtg(overview.data?.totalNatcashWithdrawalsCents ?? 0)}
                 </div>
+                <TrackedSince date={overview.data?.trackedSince.natcashWithdrawals} />
               </div>
             </div>
           )}
+          <p className="mt-4 text-xs text-muted-foreground">
+            Chaque rail a sa propre date de debut de suivi (ci-dessus) : un ecart entre deux chiffres peut
+            venir d&apos;une fenetre de suivi plus courte, pas forcement d&apos;un vrai desequilibre. Le
+            portefeuille etant partage entre tous les jeux, un depot par une methode peut tout a fait etre
+            retire par une autre.
+          </p>
         </CardContent>
       </Card>
 

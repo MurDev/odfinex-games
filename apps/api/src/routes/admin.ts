@@ -281,12 +281,18 @@ const BAZIK_WITHDRAWAL_FEE_RATE = 0.05;
 
 adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin, async (c) => {
   const [moncashDeposits] = await db
-    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .select({
+      total: sql<number>`coalesce(sum(amount_cents),0)::int`,
+      earliest: sql<string | null>`min(created_at)`,
+    })
     .from(depositOrders)
     .where(and(eq(depositOrders.status, "successful"), eq(depositOrders.environment, "live")));
 
   const [moncashWithdrawals] = await db
-    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .select({
+      total: sql<number>`coalesce(sum(amount_cents),0)::int`,
+      earliest: sql<string | null>`min(created_at)`,
+    })
     .from(withdrawalRequests)
     .where(
       and(
@@ -297,7 +303,10 @@ adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin,
     );
 
   const [natcashDeposits] = await db
-    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .select({
+      total: sql<number>`coalesce(sum(amount_cents),0)::int`,
+      earliest: sql<string | null>`min(created_at)`,
+    })
     .from(manualDepositRequests)
     .where(
       and(eq(manualDepositRequests.status, "approved"), eq(manualDepositRequests.environment, "live")),
@@ -307,6 +316,7 @@ adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin,
     .select({
       totalAmount: sql<number>`coalesce(sum(amount_cents),0)::int`,
       totalFees: sql<number>`coalesce(sum(fee_cents),0)::int`,
+      earliest: sql<string | null>`min(created_at)`,
     })
     .from(withdrawalRequests)
     .where(
@@ -355,6 +365,8 @@ adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin,
     estimatedBazikWithdrawalFeesCents -
     totalNatcashFeesCents;
 
+  const toIso = (v: string | null | undefined) => (v ? new Date(v).toISOString() : null);
+
   return c.json({
     totalMoncashDepositsCents,
     totalMoncashWithdrawalsCents,
@@ -366,6 +378,12 @@ adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin,
     totalRakeCents,
     totalReferralCommissionsCents,
     netProfitCents,
+    trackedSince: {
+      moncashDeposits: toIso(moncashDeposits?.earliest),
+      moncashWithdrawals: toIso(moncashWithdrawals?.earliest),
+      natcashDeposits: toIso(natcashDeposits?.earliest),
+      natcashWithdrawals: toIso(natcashWithdrawals?.earliest),
+    },
   });
 });
 

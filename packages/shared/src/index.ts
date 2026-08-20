@@ -418,6 +418,18 @@ export const AdminFinanceOverviewSchema = z.object({
   /** Money paid out to referrers on paid matches — a real cost, not deducted anywhere else. */
   totalReferralCommissionsCents: z.number().int().nonnegative(),
   netProfitCents: z.number().int(),
+  /**
+   * Earliest tracked transaction date behind each total — the four figures don't
+   * necessarily share a start date (e.g. a payment rail added later than another),
+   * so a lopsided comparison between them can be a tracking-window artifact
+   * rather than a real imbalance.
+   */
+  trackedSince: z.object({
+    moncashDeposits: z.string().nullable(),
+    moncashWithdrawals: z.string().nullable(),
+    natcashDeposits: z.string().nullable(),
+    natcashWithdrawals: z.string().nullable(),
+  }),
 });
 
 export type AdminFinanceOverview = z.infer<typeof AdminFinanceOverviewSchema>;
