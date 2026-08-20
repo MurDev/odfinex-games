@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { formatHtg } from "@/lib/api";
+import { computeNatcashFeeCents } from "@odfinex/shared";
 
 type NatcashFeeDialogProps = {
   withdrawalId: string;
@@ -32,7 +33,10 @@ export function NatcashFeeDialog({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [feeHtg, setFeeHtg] = useState("");
+  const suggestedFeeCents = computeNatcashFeeCents(amountCents);
+  const [feeHtg, setFeeHtg] = useState(
+    suggestedFeeCents != null ? (suggestedFeeCents / 100).toFixed(2) : "",
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,8 +84,7 @@ export function NatcashFeeDialog({
                 </span>
               )}
               {displayName ? `${displayName} — ` : ""}
-              {formatHtg(amountCents)} a envoyer par virement P2P. Saisis le frais NatCash
-              reellement paye pour ce virement (obligatoire).
+              {formatHtg(amountCents)} a envoyer par virement P2P.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -97,6 +100,11 @@ export function NatcashFeeDialog({
                 required
                 autoFocus
               />
+              <p className="text-xs text-muted-foreground">
+                {suggestedFeeCents != null
+                  ? "Pre-rempli d'apres le bareme NatCash. Corrige si le virement reel differe."
+                  : "Hors bareme connu (montant hors plage 20-99 999 HTG) : saisis le frais reellement paye."}
+              </p>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

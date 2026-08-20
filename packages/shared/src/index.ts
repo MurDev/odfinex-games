@@ -348,6 +348,41 @@ export const AdminNatcashBalanceSchema = z.object({
 
 export type AdminNatcashBalance = z.infer<typeof AdminNatcashBalanceSchema>;
 
+/**
+ * NatCash P2P transfer fee schedule (HTG), as confirmed by the operator —
+ * a fixed tiered rate, not a per-transaction variable fee. Tiers are
+ * inclusive of their upper bound and contiguous from 500 HTG upward; below
+ * 500 HTG the transfer is free. Sourced from the operator directly, not from
+ * a NatCash API (none exists for withdrawals — transfers are manual P2P).
+ */
+const NATCASH_FEE_TIERS_HTG: ReadonlyArray<{ maxHtg: number; feeHtg: number }> = [
+  { maxHtg: 499, feeHtg: 0 },
+  { maxHtg: 999, feeHtg: 6 },
+  { maxHtg: 1999, feeHtg: 18 },
+  { maxHtg: 3999, feeHtg: 25 },
+  { maxHtg: 7999, feeHtg: 35 },
+  { maxHtg: 11999, feeHtg: 54 },
+  { maxHtg: 19999, feeHtg: 63 },
+  { maxHtg: 40000, feeHtg: 68 },
+  { maxHtg: 59999, feeHtg: 90 },
+  { maxHtg: 74999, feeHtg: 108 },
+  { maxHtg: 99999, feeHtg: 115 },
+];
+
+/**
+ * Looks up the known NatCash P2P fee for a withdrawal amount. Returns null
+ * outside the confirmed table range (below 20 HTG, or above 99 999 HTG),
+ * where the real fee must be entered manually — never guessed.
+ */
+export function computeNatcashFeeCents(amountCents: number): number | null {
+  const amountHtg = amountCents / 100;
+  if (amountHtg < 20) return null;
+  for (const tier of NATCASH_FEE_TIERS_HTG) {
+    if (amountHtg <= tier.maxHtg) return tier.feeHtg * 100;
+  }
+  return null;
+}
+
 export const AdminNatcashSnapshotCreateSchema = z.object({
   balanceCents: z.number().int().nonnegative(),
   note: z.string().max(500).optional(),
