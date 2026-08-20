@@ -1,5 +1,19 @@
 import { Hono } from "hono";
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  like,
+  notLike,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import {
   AdminNatcashSnapshotCreateSchema,
@@ -41,6 +55,16 @@ import {
 type Env = { Variables: AuthVariables };
 
 export const adminRoutes = new Hono<Env>();
+
+/**
+ * manual_deposit_request predates the dedicated deposit_order (Bazik/MonCash)
+ * table: Ludolakay's own historical MonCash deposit history (from its own
+ * local Bazik integration) was backfilled into this table, with ids formatted
+ * "ludolakay-pd:BZK_production_...". Those rows are real MonCash deposits,
+ * not NatCash — excluding them here (and counting them as MonCash below) is
+ * the only way to get an accurate method split from this table.
+ */
+const MANUAL_DEPOSIT_BAZIK_BACKFILL_PATTERN = "%BZK%";
 
 /* ── Admin gate ── */
 
@@ -190,7 +214,11 @@ adminRoutes.get(
       .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
       .from(manualDepositRequests)
       .where(
-        and(eq(manualDepositRequests.status, "approved"), eq(manualDepositRequests.environment, "live")),
+        and(
+          eq(manualDepositRequests.status, "approved"),
+          eq(manualDepositRequests.environment, "live"),
+          notLike(manualDepositRequests.id, MANUAL_DEPOSIT_BAZIK_BACKFILL_PATTERN),
+        ),
       );
 
     const [withdrawalsRow] = await db
@@ -280,13 +308,36 @@ const BAZIK_DEPOSIT_FEE_RATE = 0.029;
 const BAZIK_WITHDRAWAL_FEE_RATE = 0.05;
 
 adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin, async (c) => {
-  const [moncashDeposits] = await db
+  const [moncashDepositsOrders] = await db
     .select({
       total: sql<number>`coalesce(sum(amount_cents),0)::int`,
       earliest: sql<string | null>`min(created_at)`,
     })
     .from(depositOrders)
     .where(and(eq(depositOrders.status, "successful"), eq(depositOrders.environment, "live")));
+
+  // Ludolakay's pre-deposit_order MonCash history, backfilled into manual_deposit_request
+  // (see MANUAL_DEPOSIT_BAZIK_BACKFILL_PATTERN) — real MonCash money, not NatCash.
+  const [moncashDepositsBackfill] = await db
+    .select({
+      total: sql<number>`coalesce(sum(amount_cents),0)::int`,
+      earliest: sql<string | null>`min(created_at)`,
+    })
+    .from(manualDepositRequests)
+    .where(
+      and(
+        eq(manualDepositRequests.status, "approved"),
+        eq(manualDepositRequests.environment, "live"),
+        like(manualDepositRequests.id, MANUAL_DEPOSIT_BAZIK_BACKFILL_PATTERN),
+      ),
+    );
+
+  const moncashDeposits = {
+    total: (moncashDepositsOrders?.total ?? 0) + (moncashDepositsBackfill?.total ?? 0),
+    earliest: [moncashDepositsOrders?.earliest, moncashDepositsBackfill?.earliest]
+      .filter((d): d is string => Boolean(d))
+      .sort()[0] ?? null,
+  };
 
   const [moncashWithdrawals] = await db
     .select({
@@ -309,7 +360,11 @@ adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin,
     })
     .from(manualDepositRequests)
     .where(
-      and(eq(manualDepositRequests.status, "approved"), eq(manualDepositRequests.environment, "live")),
+      and(
+        eq(manualDepositRequests.status, "approved"),
+        eq(manualDepositRequests.environment, "live"),
+        notLike(manualDepositRequests.id, MANUAL_DEPOSIT_BAZIK_BACKFILL_PATTERN),
+      ),
     );
 
   const [natcashWithdrawals] = await db
