@@ -62,13 +62,14 @@ export default async function GamesPage() {
                 <TableHead>Secret</TableHead>
                 <TableHead>Joueurs</TableHead>
                 <TableHead>Volume</TableHead>
+                <TableHead>Rake</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
                   {games.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
                     Aucun jeu enregistre
                   </TableCell>
                 </TableRow>
@@ -99,6 +100,7 @@ export default async function GamesPage() {
                   </TableCell>
                   <TableCell>{game.playerCount}</TableCell>
                   <TableCell>{formatHtg(game.volumeCents)}</TableCell>
+                  <TableCell>{formatHtg(game.totalRakeCents)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild>
                       <Link href={`/games/${game.clientId}`}>

@@ -9,6 +9,7 @@ import {
   AdminWithdrawalApproveRequestSchema,
 } from "@odfinex/shared";
 import {
+  depositOrders,
   gameClients,
   ledgerEntries,
   manualDepositRequests,
@@ -260,6 +261,74 @@ adminRoutes.post(
   },
 );
 
+/**
+ * Bazik's stated fixed rates (confirmed by the operator): ~2.9% on MonCash
+ * deposits, ~5% on MonCash withdrawals. Not a live per-transaction figure —
+ * Bazik doesn't report the exact fee it kept on each transaction, so this is
+ * an estimate applied to the gross totals actually processed.
+ */
+const BAZIK_DEPOSIT_FEE_RATE = 0.029;
+const BAZIK_WITHDRAWAL_FEE_RATE = 0.05;
+
+adminRoutes.get("/admin/finance/overview", requirePlatformSession, requireAdmin, async (c) => {
+  const [moncashDeposits] = await db
+    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .from(depositOrders)
+    .where(eq(depositOrders.status, "successful"));
+
+  const [moncashWithdrawals] = await db
+    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .from(withdrawalRequests)
+    .where(and(eq(withdrawalRequests.method, "moncash"), eq(withdrawalRequests.status, "successful")));
+
+  const [natcashDeposits] = await db
+    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .from(manualDepositRequests)
+    .where(eq(manualDepositRequests.status, "approved"));
+
+  const [natcashWithdrawals] = await db
+    .select({
+      totalAmount: sql<number>`coalesce(sum(amount_cents),0)::int`,
+      totalFees: sql<number>`coalesce(sum(fee_cents),0)::int`,
+    })
+    .from(withdrawalRequests)
+    .where(and(eq(withdrawalRequests.method, "natcash"), eq(withdrawalRequests.status, "successful")));
+
+  const [rakeRow] = await db
+    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .from(rakeEvents);
+
+  const totalMoncashDepositsCents = moncashDeposits?.total ?? 0;
+  const totalMoncashWithdrawalsCents = moncashWithdrawals?.total ?? 0;
+  const totalNatcashDepositsCents = natcashDeposits?.total ?? 0;
+  const totalNatcashWithdrawalsCents = natcashWithdrawals?.totalAmount ?? 0;
+  const totalNatcashFeesCents = natcashWithdrawals?.totalFees ?? 0;
+  const totalRakeCents = rakeRow?.total ?? 0;
+
+  const estimatedBazikDepositFeesCents = Math.round(totalMoncashDepositsCents * BAZIK_DEPOSIT_FEE_RATE);
+  const estimatedBazikWithdrawalFeesCents = Math.round(
+    totalMoncashWithdrawalsCents * BAZIK_WITHDRAWAL_FEE_RATE,
+  );
+
+  const netProfitCents =
+    totalRakeCents -
+    estimatedBazikDepositFeesCents -
+    estimatedBazikWithdrawalFeesCents -
+    totalNatcashFeesCents;
+
+  return c.json({
+    totalMoncashDepositsCents,
+    totalMoncashWithdrawalsCents,
+    totalNatcashDepositsCents,
+    totalNatcashWithdrawalsCents,
+    totalNatcashFeesCents,
+    estimatedBazikDepositFeesCents,
+    estimatedBazikWithdrawalFeesCents,
+    totalRakeCents,
+    netProfitCents,
+  });
+});
+
 /* ── Games ── */
 
 adminRoutes.get("/admin/games", requirePlatformSession, requireAdmin, async (c) => {
@@ -282,6 +351,11 @@ adminRoutes.get("/admin/games", requirePlatformSession, requireAdmin, async (c) 
         .from(ledgerEntries)
         .where(and(eq(ledgerEntries.clientId, g.clientId), eq(ledgerEntries.type, "credit")));
 
+      const [rake] = await db
+        .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+        .from(rakeEvents)
+        .where(eq(rakeEvents.clientId, g.clientId));
+
       return {
         clientId: g.clientId,
         name: g.name,
@@ -298,6 +372,7 @@ adminRoutes.get("/admin/games", requirePlatformSession, requireAdmin, async (c) 
         totalDebits: debits?.total ?? 0,
         totalCredits: credits?.total ?? 0,
         volumeCents: (debits?.total ?? 0) + (credits?.total ?? 0),
+        totalRakeCents: rake?.total ?? 0,
       };
     }),
   );
@@ -331,6 +406,11 @@ adminRoutes.get("/admin/games/:clientId", requirePlatformSession, requireAdmin, 
     .from(ledgerEntries)
     .where(and(eq(ledgerEntries.clientId, clientId), eq(ledgerEntries.type, "credit")));
 
+  const [rake] = await db
+    .select({ total: sql<number>`coalesce(sum(amount_cents),0)::int` })
+    .from(rakeEvents)
+    .where(eq(rakeEvents.clientId, clientId));
+
   return c.json({
     clientId: game.clientId,
     name: game.name,
@@ -347,6 +427,7 @@ adminRoutes.get("/admin/games/:clientId", requirePlatformSession, requireAdmin, 
     totalDebits: debits?.total ?? 0,
     totalCredits: credits?.total ?? 0,
     volumeCents: (debits?.total ?? 0) + (credits?.total ?? 0),
+    totalRakeCents: rake?.total ?? 0,
   });
 });
 

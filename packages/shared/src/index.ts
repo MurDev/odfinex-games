@@ -364,6 +364,27 @@ export const AdminBazikBalanceSchema = z.object({
 
 export type AdminBazikBalance = z.infer<typeof AdminBazikBalanceSchema>;
 
+/**
+ * Platform-wide profit & loss overview. Deposits/withdrawals are inherently
+ * platform-wide (a single shared Odfinex wallet funds every game), not
+ * per-game — only rake (via AdminRakeStatsSchema.byGame) is attributable to
+ * one specific game.
+ */
+export const AdminFinanceOverviewSchema = z.object({
+  totalMoncashDepositsCents: z.number().int().nonnegative(),
+  totalMoncashWithdrawalsCents: z.number().int().nonnegative(),
+  totalNatcashDepositsCents: z.number().int().nonnegative(),
+  totalNatcashWithdrawalsCents: z.number().int().nonnegative(),
+  totalNatcashFeesCents: z.number().int().nonnegative(),
+  /** Estimated from Bazik's stated fixed rates (deposit ~2.9%, withdrawal ~5%) — not a live per-transaction figure. */
+  estimatedBazikDepositFeesCents: z.number().int().nonnegative(),
+  estimatedBazikWithdrawalFeesCents: z.number().int().nonnegative(),
+  totalRakeCents: z.number().int().nonnegative(),
+  netProfitCents: z.number().int(),
+});
+
+export type AdminFinanceOverview = z.infer<typeof AdminFinanceOverviewSchema>;
+
 export const AdminWithdrawalApproveRequestSchema = z.object({
   feeCents: z.number().int().nonnegative().optional(),
 });
@@ -386,6 +407,7 @@ export const AdminGameStatsSchema = z.object({
   totalDebits: z.number().int().nonnegative(),
   totalCredits: z.number().int().nonnegative(),
   volumeCents: z.number().int().nonnegative(),
+  totalRakeCents: z.number().int().nonnegative(),
 });
 
 export type AdminGameStats = z.infer<typeof AdminGameStatsSchema>;

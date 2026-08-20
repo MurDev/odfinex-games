@@ -4,7 +4,7 @@ import { formatHtg } from "@/lib/api";
 import type { AdminGameStats } from "@odfinex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Gamepad2, Users, DollarSign, Activity } from "lucide-react";
+import { ArrowLeft, Gamepad2, Users, DollarSign, Activity, PiggyBank } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { GameSettings } from "./game-settings";
@@ -45,6 +45,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ cli
     { label: "Debits", value: formatHtg(game.totalDebits), icon: DollarSign },
     { label: "Credits", value: formatHtg(game.totalCredits), icon: Activity },
     { label: "Volume", value: formatHtg(game.volumeCents), icon: DollarSign },
+    { label: "Rake accumule", value: formatHtg(game.totalRakeCents), icon: PiggyBank },
   ];
 
   return (
@@ -72,7 +73,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ cli
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((s) => (
           <Card key={s.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">

@@ -1,10 +1,16 @@
 import { auth } from "@/auth";
 import { adminServerFetch } from "@/lib/server-fetch";
 import { formatHtg } from "@/lib/api";
-import type { AdminBazikBalance, AdminNatcashBalance, AdminRakeStats } from "@odfinex/shared";
+import type {
+  AdminBazikBalance,
+  AdminFinanceOverview,
+  AdminNatcashBalance,
+  AdminRakeStats,
+} from "@odfinex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Wallet, Landmark, PiggyBank } from "lucide-react";
+import { Wallet, Landmark, PiggyBank, TrendingDown, TrendingUp, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import Link from "next/link";
 import { NatcashSnapshotForm } from "./natcash-snapshot-form";
 
 async function safeFetch<T>(path: string): Promise<{ data: T | null; error: string | null }> {
@@ -19,22 +25,112 @@ export default async function FinancePage() {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const [bazik, natcash, rake] = await Promise.all([
+  const [bazik, natcash, rake, overview] = await Promise.all([
     safeFetch<AdminBazikBalance>("/admin/finance/bazik-balance"),
     safeFetch<AdminNatcashBalance>("/admin/finance/natcash-balance"),
     safeFetch<AdminRakeStats>("/admin/finance/rake"),
+    safeFetch<AdminFinanceOverview>("/admin/finance/overview"),
   ]);
+
+  const netProfit = overview.data?.netProfitCents ?? 0;
+  const isProfit = netProfit >= 0;
+  const totalFees =
+    (overview.data?.estimatedBazikDepositFeesCents ?? 0) +
+    (overview.data?.estimatedBazikWithdrawalFeesCents ?? 0) +
+    (overview.data?.totalNatcashFeesCents ?? 0);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Finance</h1>
         <p className="text-sm text-muted-foreground">
-          Marge reelle : rake accumule, solde Bazik (MonCash) et solde NatCash estime.
+          Marge reelle : rake accumule moins les frais de depot/retrait absorbes.
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Profit net (tous jeux, depuis la mise en place du tracking)
+          </CardTitle>
+          {isProfit ? (
+            <TrendingUp className="h-4 w-4 text-emerald-600" />
+          ) : (
+            <TrendingDown className="h-4 w-4 text-destructive" />
+          )}
+        </CardHeader>
+        <CardContent>
+          {overview.error ? (
+            <p className="text-sm text-destructive">{overview.error}</p>
+          ) : (
+            <>
+              <div className={`text-3xl font-bold ${isProfit ? "text-emerald-600" : "text-destructive"}`}>
+                {formatHtg(netProfit)}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Rake {formatHtg(overview.data?.totalRakeCents ?? 0)} − frais absorbes {formatHtg(totalFees)}{" "}
+                (Bazik depot {formatHtg(overview.data?.estimatedBazikDepositFeesCents ?? 0)} · Bazik retrait{" "}
+                {formatHtg(overview.data?.estimatedBazikWithdrawalFeesCents ?? 0)} · NatCash{" "}
+                {formatHtg(overview.data?.totalNatcashFeesCents ?? 0)})
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Les frais Bazik sont estimes a partir des taux fixes annonces (2,9% depot, 5% retrait) : Bazik
+                ne communique pas le montant exact preleve par transaction.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Depots &amp; retraits (tous jeux, portefeuille Odfinex partage)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {overview.error ? (
+            <p className="text-sm text-destructive">{overview.error}</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <ArrowDownToLine className="h-3 w-3" /> MonCash depots
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatHtg(overview.data?.totalMoncashDepositsCents ?? 0)}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <ArrowUpFromLine className="h-3 w-3" /> MonCash retraits
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatHtg(overview.data?.totalMoncashWithdrawalsCents ?? 0)}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <ArrowDownToLine className="h-3 w-3" /> NatCash depots
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatHtg(overview.data?.totalNatcashDepositsCents ?? 0)}
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <ArrowUpFromLine className="h-3 w-3" /> NatCash retraits
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatHtg(overview.data?.totalNatcashWithdrawalsCents ?? 0)}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Solde Bazik</CardTitle>
@@ -79,48 +175,36 @@ export default async function FinancePage() {
             )}
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Rake accumule
-            </CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {rake.error ? (
-              <p className="text-sm text-destructive">{rake.error}</p>
-            ) : (
-              <>
-                <div className="text-2xl font-bold text-primary">
-                  {formatHtg(rake.data?.totalRakeCents ?? 0)}
-                </div>
-                <p className="text-xs text-muted-foreground">Tous jeux, depuis la mise en place du tracking</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm font-medium text-muted-foreground">Rake par jeu</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Rake par jeu
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {rake.data && rake.data.byGame.length > 0 ? (
+          {rake.error ? (
+            <p className="text-sm text-destructive">{rake.error}</p>
+          ) : rake.data && rake.data.byGame.length > 0 ? (
             <div className="space-y-2">
               {rake.data.byGame.map((g) => (
-                <div
+                <Link
                   key={g.clientId}
-                  className="flex items-center justify-between border-b border-border py-2 last:border-0"
+                  href={`/games/${g.clientId}`}
+                  className="flex items-center justify-between border-b border-border py-2 transition-colors last:border-0 hover:bg-sidebar-accent"
                 >
                   <div>
                     <p className="text-sm font-medium">{g.gameName ?? g.clientId}</p>
                     <p className="text-xs text-muted-foreground">{g.eventCount} matchs regles</p>
                   </div>
-                  <div className="font-mono text-sm">{formatHtg(g.totalRakeCents)}</div>
-                </div>
+                  <div className="flex items-center gap-2">
+                    <PiggyBank className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-mono text-sm">{formatHtg(g.totalRakeCents)}</span>
+                  </div>
+                </Link>
               ))}
+              <p className="pt-2 text-xs text-muted-foreground">Total : {formatHtg(rake.data.totalRakeCents)}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Aucun rake enregistre pour le moment.</p>
