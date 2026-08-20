@@ -300,6 +300,7 @@ export type ClientTransactionsResponse = z.infer<
 >;
 
 export const AdminStatsSchema = z.object({
+  totalAccounts: z.number().int().nonnegative(),
   totalUsers: z.number().int().nonnegative(),
   totalBots: z.number().int().nonnegative(),
   totalGames: z.number().int().nonnegative(),

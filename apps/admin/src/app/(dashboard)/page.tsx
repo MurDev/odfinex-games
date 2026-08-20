@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Users,
+  UserRound,
   Bot,
   Gamepad2,
   ArrowLeftRight,
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
   if (!session?.user?.id) return null;
 
   let stats: AdminStats = {
+    totalAccounts: 0,
     totalUsers: 0,
     totalBots: 0,
     totalGames: 0,
@@ -51,11 +53,11 @@ export default async function DashboardPage() {
   }
 
   const cards = [
-    { title: "Joueurs", value: stats.totalUsers, icon: Users, description: "Comptes inscrits" },
+    { title: "Total comptes", value: stats.totalAccounts, icon: Users, description: "Joueurs + bots" },
+    { title: "Joueurs humains", value: stats.totalUsers, icon: UserRound, description: "Comptes inscrits" },
     { title: "Bots", value: stats.totalBots, icon: Bot, description: "Comptes provisionnes (jeux)" },
     { title: "Jeux", value: stats.totalGames, icon: Gamepad2, description: "Jeux enregistres" },
     { title: "Transactions", value: stats.totalTransactions, icon: ArrowLeftRight, description: "Ecritures ledger" },
-    { title: "Solde total", value: formatHtg(stats.totalWalletBalance), icon: Wallet, description: "Balance cumulee" },
   ];
 
   return (
@@ -111,7 +113,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">Volume total</CardTitle>
@@ -119,6 +121,16 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="text-3xl font-bold text-primary">{formatHtg(stats.totalVolumeCents)}</div>
             <p className="mt-1 text-xs text-muted-foreground">Volume cumule debit + credit</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Solde total</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{formatHtg(stats.totalWalletBalance)}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Balance cumulee des portefeuilles</p>
           </CardContent>
         </Card>
 

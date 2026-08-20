@@ -78,6 +78,9 @@ adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) 
   const [botCount] = await db
     .select({ count: sql<number>`count(*) filter (where is_bot)::int` })
     .from(users);
+  const [accountCount] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(users);
   const [gameCount] = await db
     .select({ count: sql<number>`count(distinct name)::int` })
     .from(gameClients);
@@ -99,6 +102,7 @@ adminRoutes.get("/admin/stats", requirePlatformSession, requireAdmin, async (c) 
     .where(eq(withdrawalRequests.status, "pending"));
 
   return c.json({
+    totalAccounts: accountCount?.count ?? 0,
     totalUsers: userCount?.count ?? 0,
     totalBots: botCount?.count ?? 0,
     totalGames: gameCount?.count ?? 0,
