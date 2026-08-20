@@ -415,6 +415,8 @@ export const AdminFinanceOverviewSchema = z.object({
   estimatedBazikDepositFeesCents: z.number().int().nonnegative(),
   estimatedBazikWithdrawalFeesCents: z.number().int().nonnegative(),
   totalRakeCents: z.number().int().nonnegative(),
+  /** Money paid out to referrers on paid matches — a real cost, not deducted anywhere else. */
+  totalReferralCommissionsCents: z.number().int().nonnegative(),
   netProfitCents: z.number().int(),
 });
 

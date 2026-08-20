@@ -68,8 +68,10 @@ export default async function FinancePage() {
                 {formatHtg(netProfit)}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Rake {formatHtg(overview.data?.totalRakeCents ?? 0)} − frais absorbes {formatHtg(totalFees)}{" "}
-                (Bazik depot {formatHtg(overview.data?.estimatedBazikDepositFeesCents ?? 0)} · Bazik retrait{" "}
+                Rake {formatHtg(overview.data?.totalRakeCents ?? 0)} − commissions parrainage{" "}
+                {formatHtg(overview.data?.totalReferralCommissionsCents ?? 0)} − frais absorbes{" "}
+                {formatHtg(totalFees)} (Bazik depot{" "}
+                {formatHtg(overview.data?.estimatedBazikDepositFeesCents ?? 0)} · Bazik retrait{" "}
                 {formatHtg(overview.data?.estimatedBazikWithdrawalFeesCents ?? 0)} · NatCash{" "}
                 {formatHtg(overview.data?.totalNatcashFeesCents ?? 0)})
               </p>
