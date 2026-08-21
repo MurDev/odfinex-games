@@ -706,3 +706,32 @@ export const ClientSecretResponseSchema = z.object({
 });
 
 export type ClientSecretResponse = z.infer<typeof ClientSecretResponseSchema>;
+
+export const UserNotificationSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  titleFr: z.string(),
+  titleEn: z.string(),
+  titleHt: z.string(),
+  bodyFr: z.string(),
+  bodyEn: z.string(),
+  bodyHt: z.string(),
+  linkUrl: z.string().nullable(),
+  readAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+
+export type UserNotification = z.infer<typeof UserNotificationSchema>;
+
+export const UserNotificationsResponseSchema = z.object({
+  items: z.array(UserNotificationSchema),
+  unreadCount: z.number().int().nonnegative(),
+});
+
+export type UserNotificationsResponse = z.infer<typeof UserNotificationsResponseSchema>;
+
+export const MarkNotificationReadResponseSchema = z.object({
+  ok: z.literal(true),
+});
+
+export type MarkNotificationReadResponse = z.infer<typeof MarkNotificationReadResponseSchema>;

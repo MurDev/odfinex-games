@@ -3,6 +3,7 @@ import {
   UserSchema,
   CreateLaunchRequestSchema,
   SessionResponseSchema,
+  UserNotificationsResponseSchema,
 } from "./index.js";
 
 describe("shared schemas", () => {
@@ -39,5 +40,28 @@ describe("shared schemas", () => {
       expiresAt: "2026-01-01T00:15:00.000Z",
     });
     expect(session.clientId).toBe("sandbox");
+  });
+
+  it("parses a user notifications response", () => {
+    const parsed = UserNotificationsResponseSchema.parse({
+      items: [
+        {
+          id: "n1",
+          type: "whatsapp_welcome",
+          titleFr: "Bienvenue dans la communaute",
+          titleEn: "Welcome to the community",
+          titleHt: "Byenveni nan kominote a",
+          bodyFr: "Rejoins le groupe WhatsApp pour echanger avec les autres joueurs.",
+          bodyEn: "Join the WhatsApp group to chat with other players.",
+          bodyHt: "Antre nan gwoup WhatsApp la pou echanje ak lot jwe yo.",
+          linkUrl: "https://chat.whatsapp.com/abc",
+          readAt: null,
+          createdAt: "2026-08-21T00:00:00.000Z",
+        },
+      ],
+      unreadCount: 1,
+    });
+    expect(parsed.items[0]?.type).toBe("whatsapp_welcome");
+    expect(parsed.unreadCount).toBe(1);
   });
 });

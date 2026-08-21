@@ -8,6 +8,7 @@ import {
   accounts,
   sessions,
   verificationTokens,
+  ensureWhatsAppWelcomeNotification,
 } from "@odfinex/db";
 
 function requireEnv(name: string): string {
@@ -34,6 +35,16 @@ const config = {
     error: "/login",
   },
   providers: [Google],
+  events: {
+    async createUser({ user }) {
+      if (!user.id) return;
+      try {
+        await ensureWhatsAppWelcomeNotification(db, user.id);
+      } catch (err) {
+        console.error("[auth] welcome WhatsApp notification failed", err);
+      }
+    },
+  },
   callbacks: {
     session({ session, user }: { session: Session; user: User }): Session {
       if (session.user && user.id) session.user.id = user.id;

@@ -375,4 +375,54 @@ describe("OdfinexGamesClient", () => {
     expect(res.status).toBe("pending");
     expect(res.balanceCents).toBe(1000);
   });
+
+  it("listNotifications parses inbox items", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        expect(url).toContain("/v1/me/notifications");
+        return Response.json({
+          items: [
+            {
+              id: "n1",
+              type: "whatsapp_welcome",
+              titleFr: "Bienvenue dans la communaute",
+              titleEn: "Welcome to the community",
+              titleHt: "Byenveni nan kominote a",
+              bodyFr: "Rejoins le groupe",
+              bodyEn: "Join the group",
+              bodyHt: "Antre nan gwoup la",
+              linkUrl: "https://chat.whatsapp.com/abc",
+              readAt: null,
+              createdAt: "2026-08-21T00:00:00.000Z",
+            },
+          ],
+          unreadCount: 1,
+        });
+      }),
+    );
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "sandbox",
+      sessionToken: "tok",
+    });
+    const res = await client.listNotifications({ limit: 10 });
+    expect(res.unreadCount).toBe(1);
+    expect(res.items[0]?.type).toBe("whatsapp_welcome");
+  });
+
+  it("markNotificationRead posts to the notification id", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url).toBe("http://localhost:4000/v1/me/notifications/n1/read");
+      expect(init?.method).toBe("POST");
+      return Response.json({ ok: true });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "sandbox",
+      sessionToken: "tok",
+    });
+    await expect(client.markNotificationRead("n1")).resolves.toEqual({ ok: true });
+  });
 });

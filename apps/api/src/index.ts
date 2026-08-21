@@ -11,6 +11,7 @@ import { gamesRoutes } from "./routes/games.js";
 import { walletRoutes } from "./routes/wallet.js";
 import { adminRoutes } from "./routes/admin.js";
 import { webhookRoutes } from "./routes/webhooks.js";
+import { notificationRoutes } from "./routes/notifications.js";
 
 const app = new Hono();
 const port = Number(process.env.PORT ?? 4000);
@@ -56,6 +57,8 @@ app.get("/", (c) =>
     endpoints: [
       "GET /health",
       "GET /v1/me",
+      "GET /v1/me/notifications",
+      "POST /v1/me/notifications/:id/read",
       "POST /v1/launch",
       "GET /v1/session",
       "GET /v1/games",
@@ -88,6 +91,7 @@ app.get("/", (c) =>
 
 const v1 = new Hono();
 v1.route("/", meRoutes);
+v1.route("/", notificationRoutes);
 v1.route("/", launchRoutes);
 v1.route("/", sessionRoutes);
 v1.route("/", gamesRoutes);

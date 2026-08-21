@@ -14,6 +14,8 @@ import {
   WalletMutationResponseSchema,
   WalletTransactionsResponseSchema,
   WalletWithdrawResponseSchema,
+  UserNotificationsResponseSchema,
+  MarkNotificationReadResponseSchema,
   type ClientBalancesResponse,
   type ClientBotCreateResponse,
   type ClientTransactionsResponse,
@@ -25,6 +27,8 @@ import {
   type WalletMutationRequest,
   type WalletMutationResponse,
   type WalletTransactionsResponse,
+  type UserNotificationsResponse,
+  type MarkNotificationReadResponse,
 } from "@odfinex/shared";
 
 export type OdfinexGamesClientOptions = {
@@ -172,6 +176,54 @@ export class OdfinexGamesClient {
     }
 
     return UpdateUsernameResponseSchema.parse(await res.json());
+  }
+
+  /** Platform inbox (launch token or platform session). */
+  async listNotifications(opts?: {
+    limit?: number;
+  }): Promise<UserNotificationsResponse> {
+    const token = this.requireToken();
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    const res = await fetch(
+      `${this.baseUrl}/v1/me/notifications${qs ? `?${qs}` : ""}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+
+    if (!res.ok) {
+      return this.parseError(res, `GET /v1/me/notifications failed (${res.status})`);
+    }
+
+    return UserNotificationsResponseSchema.parse(await res.json());
+  }
+
+  async markNotificationRead(id: string): Promise<MarkNotificationReadResponse> {
+    const token = this.requireToken();
+    const res = await fetch(
+      `${this.baseUrl}/v1/me/notifications/${encodeURIComponent(id)}/read`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      },
+    );
+
+    if (!res.ok) {
+      return this.parseError(
+        res,
+        `POST /v1/me/notifications/${id}/read failed (${res.status})`,
+      );
+    }
+
+    return MarkNotificationReadResponseSchema.parse(await res.json());
   }
 
   async getBalance(): Promise<WalletBalance> {
@@ -884,6 +936,8 @@ export {
   RakeEventCreateRequestSchema,
   RakeEventCreateResponseSchema,
   WalletWithdrawResponseSchema,
+  UserNotificationsResponseSchema,
+  MarkNotificationReadResponseSchema,
   type HealthResponse,
   type User,
   type SessionResponse,
@@ -905,6 +959,8 @@ export {
   type RakeEventCreateResponse,
   type WalletWithdrawRequest,
   type WalletWithdrawResponse,
+  type UserNotificationsResponse,
+  type MarkNotificationReadResponse,
   type LedgerEntry,
   type ClientLedgerEntry,
 } from "@odfinex/shared";
