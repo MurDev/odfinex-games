@@ -284,7 +284,31 @@ export const ClientLedgerEntrySchema = LedgerEntrySchema.extend({
   userId: z.string(),
   displayName: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
+  withdrawalStatus: z.string().nullable().optional(),
 });
+
+export const AdminLedgerTransactionSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  displayName: z.string().nullable(),
+  email: z.string().nullable(),
+  type: z.enum(["debit", "credit"]),
+  amountCents: z.number().int(),
+  bonusCents: z.number().int(),
+  balanceAfterCents: z.number().int(),
+  category: z.string().nullable(),
+  actorId: z.string().nullable().optional(),
+  reason: z.string(),
+  clientId: z.string(),
+  environment: WalletEnvironmentSchema,
+  referenceId: z.string(),
+  createdAt: z.string(),
+  withdrawalStatus: z.string().nullable().optional(),
+  relatedDepositRequestId: z.string().nullable().optional(),
+  relatedWithdrawalRequestId: z.string().nullable().optional(),
+});
+
+export type AdminLedgerTransaction = z.infer<typeof AdminLedgerTransactionSchema>;
 
 export type ClientLedgerEntry = z.infer<typeof ClientLedgerEntrySchema>;
 
