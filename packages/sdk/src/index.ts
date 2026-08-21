@@ -5,6 +5,7 @@ import {
   ClientBalancesResponseSchema,
   ClientBotCreateResponseSchema,
   ClientTransactionsResponseSchema,
+  AdminLedgerTransactionSchema,
   RakeEventCreateResponseSchema,
   SessionResponseSchema,
   UpdateUsernameResponseSchema,
@@ -19,6 +20,7 @@ import {
   type ClientBalancesResponse,
   type ClientBotCreateResponse,
   type ClientTransactionsResponse,
+  type AdminLedgerTransaction,
   type RakeEventCreateResponse,
   type SessionResponse,
   type UpdateUsernameResponse,
@@ -317,6 +319,36 @@ export class OdfinexGamesClient {
     }
 
     return ClientTransactionsResponseSchema.parse(await res.json());
+  }
+
+  /** S2S: one ledger row this client is allowed to read. */
+  async getClientTransaction(id: string): Promise<AdminLedgerTransaction> {
+    if (!this.clientSecret) {
+      throw new OdfinexGamesError(
+        401,
+        "MISSING_CLIENT_SECRET",
+        "clientSecret is required for getClientTransaction",
+      );
+    }
+
+    const timestamp = Date.now().toString();
+    const body = "";
+    const signature = await computeClientSignature(body, timestamp, this.clientSecret);
+    const path = `/v1/client/transactions/${encodeURIComponent(id)}`;
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "x-client-id": this.clientId,
+        "x-client-secret": this.clientSecret,
+        "x-timestamp": timestamp,
+        "x-client-signature": signature,
+      },
+    });
+    if (!res.ok) {
+      return this.parseError(res, `GET ${path} failed (${res.status})`);
+    }
+    return AdminLedgerTransactionSchema.parse(await res.json());
   }
 
   async debit(input: WalletMutationRequest): Promise<WalletMutationResponse> {

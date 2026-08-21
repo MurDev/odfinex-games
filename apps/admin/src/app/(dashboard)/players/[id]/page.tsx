@@ -191,15 +191,18 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                   <TableHead>Motif</TableHead>
                   <TableHead>Jeu</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {transactions.map((tx) => (
                   <TableRow key={tx.id}>
                     <TableCell>
-                      <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
-                        {tx.type === "credit" ? "Credit" : "Debit"}
-                      </Badge>
+                      <Link href={`/transactions/${tx.id}`}>
+                        <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
+                          {tx.type === "credit" ? "Credit" : "Debit"}
+                        </Badge>
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{tx.environment}</Badge>
@@ -217,6 +220,11 @@ export default async function PlayerDetailPage({ params }: { params: Promise<{ i
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(tx.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/transactions/${tx.id}`}>Detail</Link>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -44,6 +44,7 @@ import { applyLedgerMutation } from "../lib/wallet.js";
 import { requirePlatformSession, type AuthVariables } from "../middleware/auth.js";
 import { generateClientSecret } from "../lib/signature.js";
 import { notifyGameWalletEvent } from "../lib/notify-game.js";
+import { loadLedgerTransactionById, serializeLedgerDetail } from "../lib/ledger-detail.js";
 import {
   BazikNetworkError,
   classifyWithdrawOutcome,
@@ -1184,6 +1185,14 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
     }),
     total: totalRow?.count ?? 0,
   });
+});
+
+adminRoutes.get("/admin/transactions/:id", requirePlatformSession, requireAdmin, async (c) => {
+  const id = c.req.param("id");
+  if (!id) return apiError(c, 400, "BAD_REQUEST", "id required");
+  const tx = await loadLedgerTransactionById(id);
+  if (!tx) return apiError(c, 404, "NOT_FOUND", "Transaction not found");
+  return c.json(serializeLedgerDetail(tx));
 });
 
 /* ── Payment rails (per-method enable/config, e.g. NatCash, MonCash) ── */

@@ -35,6 +35,11 @@ import {
   getBalanceCents,
 } from "../lib/wallet.js";
 import {
+  clientCanReadLedgerTx,
+  loadLedgerTransactionById,
+  serializeLedgerDetail,
+} from "../lib/ledger-detail.js";
+import {
   requirePlatformSession,
   type AuthVariables,
 } from "../middleware/auth.js";
@@ -707,6 +712,17 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
     limit,
     offset,
   });
+});
+
+s2s.get("/client/transactions/:id", requireS2SClientAuth, async (c) => {
+  const clientId = c.get("clientId");
+  const id = c.req.param("id");
+  if (!clientId || !id) return apiError(c, 401, "UNAUTHORIZED", "Missing client");
+  const tx = await loadLedgerTransactionById(id);
+  if (!tx || !(await clientCanReadLedgerTx(clientId, tx))) {
+    return apiError(c, 404, "NOT_FOUND", "Transaction not found");
+  }
+  return c.json(serializeLedgerDetail(tx));
 });
 
 /** S2S read-only: manual NatCash deposit requests for this game's players */
