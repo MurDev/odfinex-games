@@ -291,6 +291,31 @@ export const rakeEvents = pgTable(
   (table) => [unique("rake_event_client_ref_unique").on(table.clientId, table.referenceId)],
 );
 
+/** Per-user inbox (welcome WhatsApp, later platform notices). Targeted only — one row per user. */
+export const userNotifications = pgTable(
+  "user_notification",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** e.g. whatsapp_welcome */
+    type: text("type").notNull(),
+    titleFr: text("title_fr").notNull(),
+    titleEn: text("title_en").notNull(),
+    titleHt: text("title_ht").notNull(),
+    bodyFr: text("body_fr").notNull(),
+    bodyEn: text("body_en").notNull(),
+    bodyHt: text("body_ht").notNull(),
+    linkUrl: text("link_url"),
+    readAt: timestamp("read_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [unique("user_notification_user_type_unique").on(table.userId, table.type)],
+);
+
 /** Admin-declared NatCash account balance snapshots, used to reconcile drift against the computed balance. */
 export const natcashBalanceSnapshots = pgTable("natcash_balance_snapshot", {
   id: text("id")

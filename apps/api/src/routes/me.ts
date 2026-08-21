@@ -15,7 +15,7 @@ meRoutes.get("/me", requirePlatformSession, (c) => {
 });
 
 /** Resolve the acting user from a launch token (game) OR a platform session (web). */
-async function resolveUserId(c: {
+export async function resolveUserId(c: {
   req: {
     header: (name: string) => string | undefined;
   };
