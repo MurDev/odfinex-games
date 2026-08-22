@@ -264,7 +264,8 @@ export const LedgerEntrySchema = z.object({
   clientId: z.string(),
   environment: WalletEnvironmentSchema,
   referenceId: z.string(),
-  category: LedgerCategorySchema,
+  // Free-form in the DB (game reasons like "duelpion: bet", holds, deposits, null).
+  category: z.string().nullable(),
   actorId: z.string().optional(),
   createdAt: z.string().datetime(),
 });

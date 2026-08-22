@@ -139,6 +139,69 @@ describe("OdfinexGamesClient", () => {
     expect(res.items[0]?.reason).toBe("moncash_deposit");
   });
 
+  it("getTransactions accepts free-form ledger categories", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          items: [
+            {
+              id: "tx1",
+              type: "debit",
+              amountCents: 100,
+              bonusCents: 0,
+              balanceAfterCents: 50,
+              reason: "duelpion: bet",
+              clientId: "duelpion.live",
+              environment: "live",
+              referenceId: "bet_1",
+              category: "duelpion: bet",
+              createdAt: "2026-08-22T00:00:00.000Z",
+            },
+            {
+              id: "tx2",
+              type: "debit",
+              amountCents: 34800,
+              bonusCents: 0,
+              balanceAfterCents: 10000,
+              reason: "moncash_withdraw_hold",
+              clientId: "platform",
+              environment: "live",
+              referenceId: "wd_1",
+              category: "moncash_withdraw_hold",
+              createdAt: "2026-08-22T00:00:00.000Z",
+            },
+            {
+              id: "tx3",
+              type: "credit",
+              amountCents: 500,
+              bonusCents: 0,
+              balanceAfterCents: 1500,
+              reason: "moncash_deposit",
+              clientId: "platform",
+              environment: "live",
+              referenceId: "dep_1",
+              category: null,
+              createdAt: "2026-08-22T00:00:00.000Z",
+            },
+          ],
+          total: 3,
+        }),
+      ),
+    );
+    const client = new OdfinexGamesClient({
+      baseUrl: "http://localhost:4000",
+      clientId: "duelpion.live",
+      sessionToken: "tok",
+    });
+    const res = await client.getTransactions({ limit: 10 });
+    expect(res.items.map((i) => i.category)).toEqual([
+      "duelpion: bet",
+      "moncash_withdraw_hold",
+      null,
+    ]);
+  });
+
   it("listClientTransactions signs empty body and requires secret", async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       expect(url).toContain("/v1/client/transactions");
