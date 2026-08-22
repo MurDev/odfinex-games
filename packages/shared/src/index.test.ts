@@ -4,6 +4,8 @@ import {
   CreateLaunchRequestSchema,
   SessionResponseSchema,
   UserNotificationsResponseSchema,
+  ClientTransactionsResponseSchema,
+  LedgerEntrySchema,
 } from "./index.js";
 
 describe("shared schemas", () => {
@@ -63,5 +65,38 @@ describe("shared schemas", () => {
     });
     expect(parsed.items[0]?.type).toBe("whatsapp_welcome");
     expect(parsed.unreadCount).toBe(1);
+  });
+
+  it("accepte les categories ledger reelles (pas un enum ferme)", () => {
+    const base = {
+      id: "tx1",
+      type: "debit" as const,
+      amountCents: 100,
+      bonusCents: 0,
+      balanceAfterCents: 50,
+      reason: "duelpion: bet",
+      clientId: "duelpion.live",
+      environment: "live" as const,
+      referenceId: "bet_1",
+      createdAt: "2026-08-22T00:00:00.000Z",
+    };
+    expect(LedgerEntrySchema.parse({ ...base, category: "duelpion: bet" }).category).toBe(
+      "duelpion: bet",
+    );
+    expect(LedgerEntrySchema.parse({ ...base, category: "moncash_withdraw_hold" }).category).toBe(
+      "moncash_withdraw_hold",
+    );
+    expect(LedgerEntrySchema.parse({ ...base, category: "moncash_deposit" }).category).toBe(
+      "moncash_deposit",
+    );
+    expect(LedgerEntrySchema.parse({ ...base, category: null }).category).toBeNull();
+
+    const listed = ClientTransactionsResponseSchema.parse({
+      items: [{ ...base, userId: "u1", displayName: "Ada", email: null, category: "duelpion: bet" }],
+      total: 1,
+      limit: 30,
+      offset: 0,
+    });
+    expect(listed.items[0]?.category).toBe("duelpion: bet");
   });
 });
