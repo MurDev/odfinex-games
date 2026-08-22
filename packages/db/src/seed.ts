@@ -20,6 +20,8 @@ type SeedGame = {
   redirectUrls: string[];
   walletEnabled: boolean;
   notifyUrl?: string;
+  /** If set, hashed for both sandbox and live (local S2S). Otherwise only sandbox gets SANDBOX_SECRET. */
+  clientSecret?: string;
 };
 
 const sandboxGame: SeedGame = {
@@ -84,15 +86,36 @@ const dominotacticsGame: SeedGame = {
     "https://dominotactics-server-production.up.railway.app/webhooks/odfinex/wallet-events",
 };
 
+/** Local Ludo stack: hub on :3000 (Google OAuth), game on :3100, game server on :3001. */
+const ludolakayGame: SeedGame = {
+  slug: "ludolakay",
+  name: "Ludo Lakay",
+  hidden: false,
+  launchUrl: "http://localhost:3100",
+  liveLaunchUrl: "http://localhost:3100",
+  redirectUrls: [
+    "http://localhost:3100",
+    "http://localhost:3100/",
+    "http://127.0.0.1:3100",
+    "http://127.0.0.1:3100/",
+  ],
+  walletEnabled: true,
+  notifyUrl: "http://localhost:3001/webhooks/odfinex/wallet-events",
+  clientSecret: SANDBOX_SECRET,
+};
+
 function hash(secret: string): string {
   return createHash("sha256").update(secret).digest("hex");
 }
 
-for (const game of [sandboxGame, duelpionGame, dominotacticsGame]) {
+for (const game of [sandboxGame, duelpionGame, dominotacticsGame, ludolakayGame]) {
   for (const environment of ["sandbox", "live"] as const) {
     const clientId = `${game.slug}.${environment}`;
-    const clientSecretHash =
-      environment === "sandbox" ? hash(SANDBOX_SECRET) : undefined;
+    const clientSecretHash = game.clientSecret
+      ? hash(game.clientSecret)
+      : environment === "sandbox"
+        ? hash(SANDBOX_SECRET)
+        : undefined;
     const launchUrl =
       environment === "live" && game.liveLaunchUrl
         ? game.liveLaunchUrl
@@ -122,6 +145,7 @@ for (const game of [sandboxGame, duelpionGame, dominotacticsGame]) {
           isActive: true,
           walletEnabled: game.walletEnabled,
           notifyUrl: game.notifyUrl,
+          ...(clientSecretHash ? { clientSecretHash } : {}),
         },
       });
 
