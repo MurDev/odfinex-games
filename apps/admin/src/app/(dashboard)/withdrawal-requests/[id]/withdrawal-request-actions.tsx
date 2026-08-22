@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { RejectDialog } from "@/components/reject-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -42,6 +43,7 @@ export function WithdrawalRequestActions({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? "Erreur");
+      toast.success("Retrait rejete");
       router.refresh();
     } catch (e) {
       throw new Error(e instanceof Error ? e.message : "Erreur");
@@ -60,9 +62,12 @@ export function WithdrawalRequestActions({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? "Erreur");
+      toast.success("Retrait approuve");
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      const message = e instanceof Error ? e.message : "Erreur";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,7 +39,9 @@ export function RejectDialog({ trigger, title, description, busy, onConfirm }: R
       setOpen(false);
       setComment("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue");
+      const message = e instanceof Error ? e.message : "Une erreur est survenue";
+      setError(message);
+      toast.error(message);
     }
   }
 

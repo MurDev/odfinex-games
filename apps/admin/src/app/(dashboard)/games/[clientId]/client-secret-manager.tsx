@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +36,11 @@ export function ClientSecretManager({ clientId, hasSecret }: Props) {
 
       const data = await res.json();
       setSecret(data.clientSecret);
+      toast.success("Cle secrete generee");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue");
+      const message = e instanceof Error ? e.message : "Une erreur est survenue";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -46,6 +50,7 @@ export function ClientSecretManager({ clientId, hasSecret }: Props) {
     if (secret) {
       await navigator.clipboard.writeText(secret);
       setCopied(true);
+      toast.success("Cle copiee");
       setTimeout(() => setCopied(false), 2000);
     }
   }

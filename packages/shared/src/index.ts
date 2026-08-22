@@ -304,8 +304,11 @@ export const AdminLedgerTransactionSchema = z.object({
   referenceId: z.string(),
   createdAt: z.string(),
   withdrawalStatus: z.string().nullable().optional(),
+  actorName: z.string().nullable().optional(),
+  actorEmail: z.string().nullable().optional(),
   relatedDepositRequestId: z.string().nullable().optional(),
   relatedWithdrawalRequestId: z.string().nullable().optional(),
+  relatedDepositOrderId: z.string().nullable().optional(),
 });
 
 export type AdminLedgerTransaction = z.infer<typeof AdminLedgerTransactionSchema>;

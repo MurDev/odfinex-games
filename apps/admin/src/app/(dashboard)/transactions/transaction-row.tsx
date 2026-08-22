@@ -5,10 +5,21 @@ import { useRouter } from "next/navigation";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatHtg } from "@/lib/api";
+import { ledgerNatureLabel, withdrawalStatusLabel } from "@/lib/ledger-labels";
 import type { TxItem } from "./page";
+
+const WITHDRAW_STATUS_VARIANT: Record<string, "secondary" | "success" | "destructive" | "warning"> = {
+  pending: "warning",
+  processing: "warning",
+  successful: "success",
+  failed: "destructive",
+  cancelled: "secondary",
+};
 
 export function TransactionRow({ tx }: { tx: TxItem }) {
   const router = useRouter();
+  const nature = ledgerNatureLabel(tx);
+  const withdrawLabel = withdrawalStatusLabel(tx.withdrawalStatus);
 
   return (
     <TableRow
@@ -26,6 +37,14 @@ export function TransactionRow({ tx }: { tx: TxItem }) {
         </Link>
       </TableCell>
       <TableCell>
+        <span className="font-medium">{nature}</span>
+        {tx.reason && tx.reason !== nature && (
+          <span className="block max-w-[180px] truncate text-xs text-muted-foreground" title={tx.reason}>
+            {tx.reason}
+          </span>
+        )}
+      </TableCell>
+      <TableCell>
         <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
           {tx.type === "credit" ? "Credit" : "Debit"}
         </Badge>
@@ -35,12 +54,21 @@ export function TransactionRow({ tx }: { tx: TxItem }) {
       <TableCell className="font-mono text-sm text-muted-foreground">
         {formatHtg(tx.balanceAfterCents)}
       </TableCell>
-      <TableCell className="max-w-[120px] truncate text-muted-foreground">
-        {tx.category ?? "—"}
+      <TableCell>
+        {withdrawLabel ? (
+          <Badge variant={WITHDRAW_STATUS_VARIANT[tx.withdrawalStatus ?? ""] ?? "secondary"}>
+            {withdrawLabel}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
       </TableCell>
-      <TableCell className="text-xs text-muted-foreground">{tx.actorId ?? "—"}</TableCell>
-      <TableCell className="max-w-[220px] truncate text-muted-foreground">{tx.reason}</TableCell>
-      <TableCell className="font-mono text-xs text-muted-foreground">{tx.clientId}</TableCell>
+      <TableCell className="text-xs text-muted-foreground">
+        {tx.actorName ?? tx.actorEmail ?? tx.actorId ?? "—"}
+      </TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">
+        {tx.clientId === "platform" ? "Plateforme" : tx.clientId}
+      </TableCell>
       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
         {new Date(tx.createdAt).toLocaleString()}
       </TableCell>

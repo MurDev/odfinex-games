@@ -36,9 +36,16 @@ import {
 } from "../lib/wallet.js";
 import {
   clientCanReadLedgerTx,
+  ledgerWithdrawalStatusSql,
   loadLedgerTransactionById,
   serializeLedgerDetail,
 } from "../lib/ledger-detail.js";
+import {
+  ledgerKindSql,
+  parseLedgerKind,
+  parseWithdrawalStatus,
+  withdrawalStatusFilterSql,
+} from "../lib/ledger-kind.js";
 import {
   requirePlatformSession,
   type AuthVariables,
@@ -625,6 +632,8 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
   const offset = Number(c.req.query("offset") ?? 0) || 0;
   const typeFilter = c.req.query("type");
   const playerFilter = c.req.query("player");
+  const kindFilter = parseLedgerKind(c.req.query("kind"));
+  const withdrawalStatus = parseWithdrawalStatus(c.req.query("withdrawalStatus"));
 
   let whereClause = and(
     sql`(
@@ -643,6 +652,12 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
   if (typeFilter === "debit" || typeFilter === "credit") {
     whereClause = and(whereClause, eq(ledgerEntries.type, typeFilter));
   }
+  if (kindFilter) {
+    whereClause = and(whereClause, ledgerKindSql(kindFilter));
+  }
+  if (withdrawalStatus) {
+    whereClause = and(whereClause, withdrawalStatusFilterSql(withdrawalStatus));
+  }
   if (playerFilter) {
     whereClause = and(whereClause, eq(ledgerEntries.userId, playerFilter));
   }
@@ -651,19 +666,6 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
     .select({ count: sql<number>`count(*)::int` })
     .from(ledgerEntries)
     .where(whereClause);
-
-  // Linked withdrawal request status for ledger entries that are part of a
-  // withdrawal lifecycle (hold debit, refund/reject/cancel credit). Matches by
-  // referenceId, tolerating the refund_/reject_/cancel_ referenceId prefixes.
-  const withdrawalStatusSub = sql<string | null>`
-    (
-      select wr.status
-      from withdrawal_request wr
-      where wr.reference_id = ${ledgerEntries.referenceId}
-         or wr.reference_id = regexp_replace(${ledgerEntries.referenceId}, '^(refund_|reject_|cancel_)', '')
-      limit 1
-    )
-  `;
 
   const items = await db
     .select({
@@ -681,7 +683,7 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
       createdAt: ledgerEntries.createdAt,
       displayName: users.name,
       email: users.email,
-      withdrawalStatus: withdrawalStatusSub,
+      withdrawalStatus: ledgerWithdrawalStatusSql,
     })
     .from(ledgerEntries)
     .leftJoin(users, eq(ledgerEntries.userId, users.id))
