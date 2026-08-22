@@ -52,9 +52,21 @@ export function ledgerKindSql(kind: LedgerKind): SQL {
         inArray(ledgerEntries.category, [...DEPOSIT_REASONS]),
       )!;
     case "bet":
-      return sql`(${ledgerEntries.reason} = 'bet' OR ${ledgerEntries.reason} LIKE 'bet_%')`;
+      return sql`(
+        ${ledgerEntries.reason} = 'bet'
+        OR ${ledgerEntries.reason} LIKE 'bet_%'
+        OR ${ledgerEntries.reason} ILIKE '%: bet'
+        OR ${ledgerEntries.category} ILIKE '%: bet'
+      )`;
     case "win":
-      return sql`(${ledgerEntries.reason} = 'win' OR ${ledgerEntries.reason} LIKE 'win_%')`;
+      return sql`(
+        ${ledgerEntries.reason} = 'win'
+        OR ${ledgerEntries.reason} = 'payout'
+        OR ${ledgerEntries.reason} LIKE 'win_%'
+        OR ${ledgerEntries.reason} ILIKE '%: win'
+        OR ${ledgerEntries.reason} ILIKE '%: payout'
+        OR ${ledgerEntries.category} ILIKE '%: payout'
+      )`;
     case "grant":
       return or(
         inArray(ledgerEntries.reason, [...GRANT_REASONS]),
