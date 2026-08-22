@@ -45,7 +45,7 @@ export function TransactionRow({ tx }: { tx: TxItem }) {
         )}
       </TableCell>
       <TableCell>
-        <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
+        <Badge variant={tx.type === "credit" ? "success" : "outline"}>
           {tx.type === "credit" ? "Credit" : "Debit"}
         </Badge>
       </TableCell>

@@ -1,18 +1,39 @@
-import { and, eq, sql } from "drizzle-orm";
-import { launchTokens, ledgerEntries, users } from "@odfinex/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { launchTokens, ledgerEntries, users, withdrawalRequests } from "@odfinex/db";
 import type { WalletEnvironment } from "@odfinex/shared";
 
 import { db } from "../db.js";
+import { withdrawalLookupRef } from "./ledger-ref.js";
+
+export { withdrawalLookupRef };
 
 export const ledgerWithdrawalStatusSql = sql<string | null>`
   (
     select wr.status
     from withdrawal_request wr
-    where wr.reference_id = ${ledgerEntries.referenceId}
-       or wr.reference_id = regexp_replace(${ledgerEntries.referenceId}, '^(refund_|reject_|cancel_)', '')
+    where wr.reference_id = regexp_replace(${ledgerEntries.referenceId}, '^(refund_|reject_|cancel_)', '')
     limit 1
   )
 `;
+
+export async function loadWithdrawalStatuses(
+  referenceIds: string[],
+): Promise<Map<string, string>> {
+  const keys = [
+    ...new Set(referenceIds.map(withdrawalLookupRef).filter((ref) => ref.startsWith("wd_"))),
+  ];
+  const map = new Map<string, string>();
+  if (keys.length === 0) return map;
+  const rows = await db
+    .select({
+      referenceId: withdrawalRequests.referenceId,
+      status: withdrawalRequests.status,
+    })
+    .from(withdrawalRequests)
+    .where(inArray(withdrawalRequests.referenceId, keys));
+  for (const row of rows) map.set(row.referenceId, row.status);
+  return map;
+}
 
 export function relatedRequestIds(referenceId: string | null | undefined): {
   relatedDepositRequestId: string | null;
@@ -25,7 +46,7 @@ export function relatedRequestIds(referenceId: string | null | undefined): {
   let relatedDepositOrderId: string | null = null;
   if (ref.startsWith("mdep_")) relatedDepositRequestId = ref.slice(5);
   if (ref.startsWith("deposit_")) relatedDepositOrderId = ref.slice("deposit_".length);
-  const stripped = ref.replace(/^(refund_|reject_|cancel_)/, "");
+  const stripped = withdrawalLookupRef(ref);
   if (stripped.startsWith("wd_")) relatedWithdrawalRequestId = stripped;
   return { relatedDepositRequestId, relatedWithdrawalRequestId, relatedDepositOrderId };
 }
@@ -103,6 +124,10 @@ export async function loadLedgerTransactionById(id: string): Promise<LedgerDetai
 
   if (!row) return null;
 
+  const statuses = await loadWithdrawalStatuses([row.referenceId]);
+  const withdrawalStatus =
+    statuses.get(withdrawalLookupRef(row.referenceId)) ?? row.withdrawalStatus ?? null;
+
   let actorName: string | null = null;
   let actorEmail: string | null = null;
   if (row.actorId) {
@@ -119,6 +144,7 @@ export async function loadLedgerTransactionById(id: string): Promise<LedgerDetai
   return {
     ...row,
     environment: row.environment as WalletEnvironment,
+    withdrawalStatus,
     actorName,
     actorEmail,
   };

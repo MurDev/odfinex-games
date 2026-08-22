@@ -47,7 +47,9 @@ import { notifyGameWalletEvent } from "../lib/notify-game.js";
 import {
   ledgerWithdrawalStatusSql,
   loadLedgerTransactionById,
+  loadWithdrawalStatuses,
   serializeLedgerDetail,
+  withdrawalLookupRef,
 } from "../lib/ledger-detail.js";
 import {
   ledgerKindSql,
@@ -1192,6 +1194,7 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
         .where(inArray(users.id, lookupIds))
     : [];
   const userById = new Map(userRows.map((u) => [u.id, u]));
+  const withdrawalByRef = await loadWithdrawalStatuses(items.map((tx) => tx.referenceId));
 
   return c.json({
     items: items.map((tx) => {
@@ -1215,7 +1218,8 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
         createdAt: tx.createdAt.toISOString(),
         displayName: player?.name ?? null,
         email: player?.email ?? null,
-        withdrawalStatus: tx.withdrawalStatus ?? null,
+        withdrawalStatus:
+          withdrawalByRef.get(withdrawalLookupRef(tx.referenceId)) ?? tx.withdrawalStatus ?? null,
       };
     }),
     total: totalRow?.count ?? 0,
