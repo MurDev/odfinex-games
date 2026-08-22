@@ -24,6 +24,8 @@ export type TxItem = {
   bonusCents: number;
   category: string | null;
   actorId: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
   reason: string;
   clientId: string;
   referenceId: string;
@@ -31,6 +33,7 @@ export type TxItem = {
   createdAt: string;
   displayName: string | null;
   email: string | null;
+  withdrawalStatus?: string | null;
 };
 
 type TxResponse = {
@@ -43,7 +46,7 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
-  const { search, game, type, page } = await searchParams;
+  const { search, game, type, kind, page } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) return null;
 
@@ -57,6 +60,7 @@ export default async function TransactionsPage({
     if (search) params.set("search", search);
     if (game) params.set("game", game);
     if (type) params.set("type", type);
+    if (kind) params.set("kind", kind);
     params.set("limit", String(PER_PAGE));
     params.set("offset", String((currentPage - 1) * PER_PAGE));
     data = await adminServerFetch<TxResponse>(`/admin/transactions?${params.toString()}`);
@@ -85,6 +89,7 @@ export default async function TransactionsPage({
         defaultValue={search ?? ""}
         game={game ?? "all"}
         type={type ?? "all"}
+        kind={kind ?? "all"}
         page={currentPage}
         total={data.total}
         perPage={PER_PAGE}
@@ -97,13 +102,13 @@ export default async function TransactionsPage({
               <TableHeader>
                 <TableRow>
                   <TableHead>Joueur</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Nature</TableHead>
+                  <TableHead>Sens</TableHead>
                   <TableHead>Montant</TableHead>
                   <TableHead>Bonus</TableHead>
                   <TableHead>Solde apres</TableHead>
-                  <TableHead>Categorie</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>Acteur</TableHead>
-                  <TableHead>Motif</TableHead>
                   <TableHead>Jeu</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>

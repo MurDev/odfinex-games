@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -58,11 +59,14 @@ export function CreateAccountDialog({ games }: CreateAccountDialogProps) {
       }
 
       const data = await res.json();
+      toast.success(`Compte cree (${data.user.email})`);
       setSuccess(`Compte cree (${data.user.email})`);
       setForm({ name: "", email: "", type: "bot", clientId: "" });
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue");
+      const message = e instanceof Error ? e.message : "Une erreur est survenue";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

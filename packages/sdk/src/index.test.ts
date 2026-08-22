@@ -156,6 +156,15 @@ describe("OdfinexGamesClient", () => {
     const res = await client.listClientTransactions({ limit: 30 });
     expect(res.total).toBe(0);
 
+    const withKind = await client.listClientTransactions({
+      kind: "withdraw",
+      withdrawalStatus: "pending",
+    });
+    expect(withKind.total).toBe(0);
+    const kindUrl = String(fetchMock.mock.calls[1]?.[0]);
+    expect(kindUrl).toContain("kind=withdraw");
+    expect(kindUrl).toContain("withdrawalStatus=pending");
+
     const bare = new OdfinexGamesClient({
       baseUrl: "http://localhost:4000",
       clientId: "duelpion.live",

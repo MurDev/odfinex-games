@@ -11,6 +11,7 @@ type TransactionsFilterProps = {
   defaultValue: string;
   game: string;
   type: string;
+  kind: string;
   page: number;
   total: number;
   perPage: number;
@@ -21,6 +22,7 @@ export function TransactionsFilter({
   defaultValue,
   game,
   type,
+  kind,
   page,
   total,
   perPage,
@@ -30,7 +32,13 @@ export function TransactionsFilter({
   const searchParams = useSearchParams();
   const [value, setValue] = useState(defaultValue);
 
-  function push(updates: { search?: string; game?: string; type?: string; page?: number }) {
+  function push(updates: {
+    search?: string;
+    game?: string;
+    type?: string;
+    kind?: string;
+    page?: number;
+  }) {
     const params = new URLSearchParams(searchParams.toString());
     if (updates.search !== undefined) {
       if (updates.search) params.set("search", updates.search);
@@ -43,6 +51,10 @@ export function TransactionsFilter({
     if (updates.type !== undefined) {
       if (updates.type !== "all") params.set("type", updates.type);
       else params.delete("type");
+    }
+    if (updates.kind !== undefined) {
+      if (updates.kind !== "all") params.set("kind", updates.kind);
+      else params.delete("kind");
     }
     if (updates.page !== undefined) {
       if (updates.page > 1) params.set("page", String(updates.page));
@@ -82,6 +94,7 @@ export function TransactionsFilter({
           <span className="text-muted-foreground">Jeu</span>
           <select className={selectClass} value={game} onChange={(e) => push({ game: e.target.value })}>
             <option value="all">Tous les jeux</option>
+            <option value="platform">Plateforme</option>
             {games.map((g) => (
               <option key={g.clientId} value={g.clientId}>
                 {g.name}
@@ -90,7 +103,18 @@ export function TransactionsFilter({
           </select>
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Type</span>
+          <span className="text-muted-foreground">Nature</span>
+          <select className={selectClass} value={kind} onChange={(e) => push({ kind: e.target.value })}>
+            <option value="all">Toutes</option>
+            <option value="deposit">Depots</option>
+            <option value="withdraw">Retraits</option>
+            <option value="bet">Mises</option>
+            <option value="win">Gains</option>
+            <option value="grant">Bonus et grants</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Sens</span>
           <select className={selectClass} value={type} onChange={(e) => push({ type: e.target.value })}>
             <option value="all">Tous</option>
             <option value="credit">Credit</option>

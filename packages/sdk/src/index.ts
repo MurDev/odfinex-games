@@ -280,6 +280,8 @@ export class OdfinexGamesClient {
     offset?: number;
     type?: "debit" | "credit";
     player?: string;
+    kind?: "withdraw" | "deposit" | "bet" | "win" | "grant";
+    withdrawalStatus?: "pending" | "processing" | "successful" | "failed" | "cancelled";
   }): Promise<ClientTransactionsResponse> {
     if (!this.clientSecret) {
       throw new OdfinexGamesError(
@@ -294,6 +296,8 @@ export class OdfinexGamesClient {
     if (opts?.offset != null) params.set("offset", String(opts.offset));
     if (opts?.type) params.set("type", opts.type);
     if (opts?.player) params.set("player", opts.player);
+    if (opts?.kind) params.set("kind", opts.kind);
+    if (opts?.withdrawalStatus) params.set("withdrawalStatus", opts.withdrawalStatus);
     const qs = params.toString();
 
     const timestamp = Date.now().toString();

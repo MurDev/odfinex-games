@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,10 +49,13 @@ export function NewGameButton() {
 
       const data = await res.json();
       setCreatedId(data.game.clientId);
+      toast.success(`Jeu cree (${data.game.clientId})`);
       setForm({ name: "", slug: "", environment: "live", launchUrl: "" });
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue");
+      const message = e instanceof Error ? e.message : "Une erreur est survenue";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

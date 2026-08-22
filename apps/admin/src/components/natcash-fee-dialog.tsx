@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -58,11 +59,14 @@ export function NatcashFeeDialog({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error?.message ?? "Erreur");
+      toast.success("Retrait NatCash approuve");
       setOpen(false);
       setFeeHtg("");
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue");
+      const message = e instanceof Error ? e.message : "Une erreur est survenue";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

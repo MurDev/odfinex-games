@@ -17,14 +17,17 @@ export const ledgerWithdrawalStatusSql = sql<string | null>`
 export function relatedRequestIds(referenceId: string | null | undefined): {
   relatedDepositRequestId: string | null;
   relatedWithdrawalRequestId: string | null;
+  relatedDepositOrderId: string | null;
 } {
   const ref = referenceId ?? "";
   let relatedDepositRequestId: string | null = null;
   let relatedWithdrawalRequestId: string | null = null;
+  let relatedDepositOrderId: string | null = null;
   if (ref.startsWith("mdep_")) relatedDepositRequestId = ref.slice(5);
+  if (ref.startsWith("deposit_")) relatedDepositOrderId = ref.slice("deposit_".length);
   const stripped = ref.replace(/^(refund_|reject_|cancel_)/, "");
   if (stripped.startsWith("wd_")) relatedWithdrawalRequestId = stripped;
-  return { relatedDepositRequestId, relatedWithdrawalRequestId };
+  return { relatedDepositRequestId, relatedWithdrawalRequestId, relatedDepositOrderId };
 }
 
 export type LedgerDetailRow = {
@@ -44,6 +47,8 @@ export type LedgerDetailRow = {
   displayName: string | null;
   email: string | null;
   withdrawalStatus: string | null;
+  actorName: string | null;
+  actorEmail: string | null;
 };
 
 export function serializeLedgerDetail(tx: LedgerDetailRow) {
@@ -58,6 +63,8 @@ export function serializeLedgerDetail(tx: LedgerDetailRow) {
     balanceAfterCents: tx.balanceAfterCents,
     category: tx.category,
     actorId: tx.actorId,
+    actorName: tx.actorName ?? null,
+    actorEmail: tx.actorEmail ?? null,
     reason: tx.reason,
     clientId: tx.clientId,
     environment: tx.environment,
@@ -95,9 +102,25 @@ export async function loadLedgerTransactionById(id: string): Promise<LedgerDetai
     .then((rows) => rows[0] ?? null);
 
   if (!row) return null;
+
+  let actorName: string | null = null;
+  let actorEmail: string | null = null;
+  if (row.actorId) {
+    const actor = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, row.actorId))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
+    actorName = actor?.name ?? null;
+    actorEmail = actor?.email ?? null;
+  }
+
   return {
     ...row,
     environment: row.environment as WalletEnvironment,
+    actorName,
+    actorEmail,
   };
 }
 

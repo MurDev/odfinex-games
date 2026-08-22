@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +31,6 @@ export default function PaymentRailsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   async function load() {
     setLoading(true);
@@ -55,7 +55,6 @@ export default function PaymentRailsPage() {
   async function save(rail: Rail) {
     setSaving(rail.id);
     setError("");
-    setSuccess("");
     try {
       const res = await fetch(`/api/proxy/admin/payment-rails/${rail.id}`, {
         method: "PATCH",
@@ -74,10 +73,12 @@ export default function PaymentRailsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error?.message ?? "Erreur");
-      setSuccess("Configuration enregistree");
+      toast.success("Configuration enregistree");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      const message = e instanceof Error ? e.message : "Erreur";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(null);
     }
@@ -111,7 +112,6 @@ export default function PaymentRailsPage() {
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
-      {success && <p className="text-sm text-emerald-400">{success}</p>}
 
       {loading ? (
         <div className="space-y-4">

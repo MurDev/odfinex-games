@@ -44,7 +44,17 @@ import { applyLedgerMutation } from "../lib/wallet.js";
 import { requirePlatformSession, type AuthVariables } from "../middleware/auth.js";
 import { generateClientSecret } from "../lib/signature.js";
 import { notifyGameWalletEvent } from "../lib/notify-game.js";
-import { loadLedgerTransactionById, serializeLedgerDetail } from "../lib/ledger-detail.js";
+import {
+  ledgerWithdrawalStatusSql,
+  loadLedgerTransactionById,
+  serializeLedgerDetail,
+} from "../lib/ledger-detail.js";
+import {
+  ledgerKindSql,
+  parseLedgerKind,
+  parseWithdrawalStatus,
+  withdrawalStatusFilterSql,
+} from "../lib/ledger-kind.js";
 import {
   BazikNetworkError,
   classifyWithdrawOutcome,
@@ -1122,12 +1132,16 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
   const typeFilter = c.req.query("type");
   const playerFilter = c.req.query("player");
   const search = c.req.query("search")?.trim() ?? "";
+  const kindFilter = parseLedgerKind(c.req.query("kind"));
+  const withdrawalStatus = parseWithdrawalStatus(c.req.query("withdrawalStatus"));
 
   let conditions: SQL | undefined;
   if (gameFilter) conditions = and(conditions, eq(ledgerEntries.clientId, gameFilter));
   if (typeFilter && (typeFilter === "debit" || typeFilter === "credit")) {
     conditions = and(conditions, eq(ledgerEntries.type, typeFilter));
   }
+  if (kindFilter) conditions = and(conditions, ledgerKindSql(kindFilter));
+  if (withdrawalStatus) conditions = and(conditions, withdrawalStatusFilterSql(withdrawalStatus));
   if (playerFilter) conditions = and(conditions, eq(ledgerEntries.userId, playerFilter));
 
   if (search) {
@@ -1146,7 +1160,22 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
     .where(conditions);
 
   const items = await db
-    .select()
+    .select({
+      id: ledgerEntries.id,
+      userId: ledgerEntries.userId,
+      type: ledgerEntries.type,
+      amountCents: ledgerEntries.amountCents,
+      balanceAfterCents: ledgerEntries.balanceAfterCents,
+      bonusCents: ledgerEntries.bonusCents,
+      category: ledgerEntries.category,
+      actorId: ledgerEntries.actorId,
+      reason: ledgerEntries.reason,
+      clientId: ledgerEntries.clientId,
+      environment: ledgerEntries.environment,
+      referenceId: ledgerEntries.referenceId,
+      createdAt: ledgerEntries.createdAt,
+      withdrawalStatus: ledgerWithdrawalStatusSql,
+    })
     .from(ledgerEntries)
     .where(conditions)
     .orderBy(desc(ledgerEntries.createdAt))
@@ -1154,17 +1183,20 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
     .offset(offset);
 
   const userIds = [...new Set(items.map((tx) => tx.userId))];
-  const userRows = userIds.length
+  const actorIds = [...new Set(items.map((tx) => tx.actorId).filter((id): id is string => Boolean(id)))];
+  const lookupIds = [...new Set([...userIds, ...actorIds])];
+  const userRows = lookupIds.length
     ? await db
         .select({ id: users.id, name: users.name, email: users.email })
         .from(users)
-        .where(inArray(users.id, userIds))
+        .where(inArray(users.id, lookupIds))
     : [];
   const userById = new Map(userRows.map((u) => [u.id, u]));
 
   return c.json({
     items: items.map((tx) => {
       const player = userById.get(tx.userId);
+      const actor = tx.actorId ? userById.get(tx.actorId) : undefined;
       return {
         id: tx.id,
         userId: tx.userId,
@@ -1174,6 +1206,8 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
         bonusCents: tx.bonusCents,
         category: tx.category,
         actorId: tx.actorId,
+        actorName: actor?.name ?? null,
+        actorEmail: actor?.email ?? null,
         reason: tx.reason,
         clientId: tx.clientId,
         environment: tx.environment as WalletEnvironment,
@@ -1181,6 +1215,7 @@ adminRoutes.get("/admin/transactions", requirePlatformSession, requireAdmin, asy
         createdAt: tx.createdAt.toISOString(),
         displayName: player?.name ?? null,
         email: player?.email ?? null,
+        withdrawalStatus: tx.withdrawalStatus ?? null,
       };
     }),
     total: totalRow?.count ?? 0,

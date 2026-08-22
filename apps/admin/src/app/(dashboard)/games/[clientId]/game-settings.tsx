@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import type { AdminGameStats } from "@odfinex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,9 +61,12 @@ export function GameSettings({ game }: GameSettingsProps) {
       }
 
       setSuccess("Modifications enregistrees");
+      toast.success("Modifications enregistrees");
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Une erreur est survenue");
+      const message = e instanceof Error ? e.message : "Une erreur est survenue";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }

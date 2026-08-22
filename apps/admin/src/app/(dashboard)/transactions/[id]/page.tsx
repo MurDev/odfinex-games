@@ -7,6 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import {
+  ledgerLifecycleLabel,
+  ledgerMethodLabel,
+  ledgerNatureLabel,
+  withdrawalStatusLabel,
+} from "@/lib/ledger-labels";
 
 const WITHDRAW_STATUS_VARIANT: Record<string, "secondary" | "success" | "destructive" | "warning"> = {
   pending: "warning",
@@ -48,6 +54,12 @@ export default async function TransactionDetailPage({
     );
   }
 
+  const nature = ledgerNatureLabel(tx);
+  const method = ledgerMethodLabel(tx.reason);
+  const lifecycle = ledgerLifecycleLabel(tx.reason);
+  const withdrawLabel = withdrawalStatusLabel(tx.withdrawalStatus);
+  const actorLabel = tx.actorName ?? tx.actorEmail ?? tx.actorId ?? "Systeme";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -58,13 +70,13 @@ export default async function TransactionDetailPage({
         </Button>
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">Transaction</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{nature}</h1>
             <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
               {tx.type === "credit" ? "Credit" : "Debit"}
             </Badge>
             {tx.withdrawalStatus && (
               <Badge variant={WITHDRAW_STATUS_VARIANT[tx.withdrawalStatus] ?? "secondary"}>
-                {tx.withdrawalStatus}
+                {withdrawLabel ?? tx.withdrawalStatus}
               </Badge>
             )}
           </div>
@@ -95,16 +107,34 @@ export default async function TransactionDetailPage({
             <p className="font-mono font-medium">{formatHtg(tx.balanceAfterCents)}</p>
           </div>
           <div>
+            <p className="text-xs text-muted-foreground">Nature</p>
+            <p className="font-medium">{nature}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Methode</p>
+            <p className="font-medium">{method ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Cycle</p>
+            <p className="font-medium">{lifecycle ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Statut demande</p>
+            <p className="font-medium">{withdrawLabel ?? "—"}</p>
+          </div>
+          <div>
             <p className="text-xs text-muted-foreground">Categorie</p>
             <p className="font-medium">{tx.category ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Motif</p>
+            <p className="text-xs text-muted-foreground">Motif brut</p>
             <p className="font-medium">{tx.reason}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Jeu / client</p>
-            <p className="font-mono font-medium">{tx.clientId}</p>
+            <p className="font-mono font-medium">
+              {tx.clientId === "platform" ? "Plateforme" : tx.clientId}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Environnement</p>
@@ -112,7 +142,10 @@ export default async function TransactionDetailPage({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Acteur</p>
-            <p className="font-medium">{tx.actorId ?? "—"}</p>
+            <p className="font-medium">{actorLabel}</p>
+            {tx.actorId && (tx.actorName || tx.actorEmail) && (
+              <p className="font-mono text-xs text-muted-foreground">{tx.actorId}</p>
+            )}
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Date</p>
@@ -122,6 +155,12 @@ export default async function TransactionDetailPage({
             <p className="text-xs text-muted-foreground">Reference</p>
             <p className="font-mono text-xs break-all">{tx.referenceId}</p>
           </div>
+          {tx.relatedDepositOrderId && (
+            <div className="sm:col-span-2">
+              <p className="text-xs text-muted-foreground">Ordre de depot MonCash</p>
+              <p className="font-mono text-xs break-all">{tx.relatedDepositOrderId}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
