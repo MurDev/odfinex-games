@@ -107,7 +107,7 @@ export default async function TransactionsPage({
                   <TableHead>Montant</TableHead>
                   <TableHead>Bonus</TableHead>
                   <TableHead>Solde apres</TableHead>
-                  <TableHead>Statut</TableHead>
+                  <TableHead>Statut demande</TableHead>
                   <TableHead>Acteur</TableHead>
                   <TableHead>Jeu</TableHead>
                   <TableHead>Date</TableHead>

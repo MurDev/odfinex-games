@@ -38,6 +38,8 @@ import {
   clientCanReadLedgerTx,
   ledgerWithdrawalStatusSql,
   loadLedgerTransactionById,
+  loadWithdrawalStatuses,
+  withdrawalLookupRef,
   serializeLedgerDetail,
 } from "../lib/ledger-detail.js";
 import {
@@ -692,6 +694,8 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
     .limit(limit)
     .offset(offset);
 
+  const withdrawalByRef = await loadWithdrawalStatuses(items.map((tx) => tx.referenceId));
+
   return c.json({
     items: items.map((tx) => ({
       id: tx.id,
@@ -708,7 +712,8 @@ s2s.get("/client/transactions", requireS2SClientAuth, async (c) => {
       environment: tx.environment as WalletEnvironment,
       referenceId: tx.referenceId,
       createdAt: tx.createdAt.toISOString(),
-      withdrawalStatus: tx.withdrawalStatus ?? null,
+      withdrawalStatus:
+        withdrawalByRef.get(withdrawalLookupRef(tx.referenceId)) ?? tx.withdrawalStatus ?? null,
     })),
     total: totalRow?.count ?? 0,
     limit,

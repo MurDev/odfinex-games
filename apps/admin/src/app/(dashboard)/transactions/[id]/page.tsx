@@ -71,7 +71,7 @@ export default async function TransactionDetailPage({
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{nature}</h1>
-            <Badge variant={tx.type === "credit" ? "success" : "destructive"}>
+            <Badge variant={tx.type === "credit" ? "success" : "outline"}>
               {tx.type === "credit" ? "Credit" : "Debit"}
             </Badge>
             {tx.withdrawalStatus && (
